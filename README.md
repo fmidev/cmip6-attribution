@@ -1,2 +1,2 @@
 # cmip6-attribution
-Repository for Python codes to calculate the impact of climate change from observed monthly mean temperatures in Finland.
+This repository contains Python software to calculate the impact of climate change from observed monthly mean temperatures in Finland. The method is documented in a study by Rantanen et al. (2023, under review).
