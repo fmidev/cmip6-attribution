@@ -19,11 +19,16 @@ Target month (1-12) / season (13-16) / annual mean (17) (e.g., 12). This is the 
 
 Target year (e.g., 2022). Target year of the calculation.
 
+```y_climate```
 
+Future climate year. Typically, 2050 is used. 
 
-Probability of warmer (1) or colder (2) temperatures?
-Depending on this parameter, either the probability of higher (1) or lower (2) temperatures than the observed one is given in the distribution plots.
-First year of baseline period? (e.g., 1901)
-Last year of baseline period? (e.g., 2022)
-These parameters define the part of the observed time series that is used as the “raw material” in calculating the probability distributions. Obviously, this range of years must fall within the years that are available for the station (but a shorter baseline period may also be selected). However, the earliest possible start for the baseline period is 1855, since this is the first year for which the 11-year running mean global mean temperature used in the method is available.
+```y_preind```
+
+Year which approximates the preindustrial climate. ```y_preind``` = 1900 is typically used.
+
+```pwarm```
+
+Probability of warmer (True) or colder (False) temperatures? Depending on this parameter, either the probability of higher (```pwarm```=True) or lower (```pwarm```=False) temperatures than the observed one is given in the distribution plots.
+
 
