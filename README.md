@@ -31,4 +31,8 @@ Year which approximates the preindustrial climate. ```y_preind``` = 1900 is typi
 
 Probability of warmer (True) or colder (False) temperatures? Depending on this parameter, either the probability of higher (```pwarm```=True) or lower (```pwarm```=False) temperatures than the observed one is given in the distribution plots.
 
+```ssp```
+
+Emission scenario for future climate (```ssp```= "ssp119", "ssp126", "ssp245", "ssp370", and "ssp585" are available).
+
 
