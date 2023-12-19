@@ -16,6 +16,16 @@ def find_nearest(array, value):
     idx = (diff).argmin()
     return array[idx]
 
+def get_model_names(input_path):
+    
+    df = pd.read_excel(input_path + 'input_data/model_names.xlsx')
+    
+    df = df['Model']
+    df.index= df.index+1
+    
+    return df
+    
+
 def get_place_text(place):
     
     place_text = {'kaisaniemi':'Helsinki Kaisaniemi',
@@ -102,6 +112,10 @@ def read_obs_temp(input_path, place, target_mon):
         import sys;
         print('Target month is not valid. Please select between 1 and 17. Aborting.')
         sys.exit()
+    
+    # neglect the NAN values
+    idx = np.isfinite(obs_temp).values
+    obs_temp = obs_temp[idx]
         
     return obs_temp
 
@@ -194,15 +208,15 @@ def read_coeffs_model_mean(input_path,ssp, target_mon, obs_lat, obs_lon):
     import sys
     
     if ssp=='ssp119':
-        filename = input_path + 'model_mean/a_T_mean_std_14mod_mean_'+ssp+'.nc'
+        filename = input_path + 'model_mean/a_T_mean_variance_14mod_mean_'+ssp+'.nc'
     elif ssp=='ssp126':
-        filename = input_path + 'model_mean/a_T_mean_std_29mod_mean_'+ssp+'.nc'
+        filename = input_path + 'model_mean/a_T_mean_variance_29mod_mean_'+ssp+'.nc'
     elif ssp=='ssp245':
-        filename = input_path + 'model_mean/a_T_mean_std_29mod_mean_'+ssp+'.nc'
+        filename = input_path + 'model_mean/a_T_mean_variance_29mod_mean_'+ssp+'.nc'
     elif ssp=='ssp370':
-        filename = input_path + 'model_mean/a_T_mean_std_30mod_mean_'+ssp+'.nc'
+        filename = input_path + 'model_mean/a_T_mean_variance_30mod_mean_'+ssp+'.nc'
     elif ssp=='ssp585':
-        filename = input_path + 'model_mean/a_T_mean_std_30mod_mean_'+ssp+'.nc'
+        filename = input_path + 'model_mean/a_T_mean_variance_30mod_mean_'+ssp+'.nc'
     else:
         print('Scenario is not valid. Aborting...')
         sys.exit() 
@@ -217,15 +231,15 @@ def read_coeffs_single_models(input_path,ssp, target_mon, obs_lat, obs_lon):
     import sys
     
     if ssp=='ssp119':
-        filename = input_path + 'single_models/a_T_mean_std_14mod_'+ssp+'.nc'
+        filename = input_path + 'single_models/a_T_mean_variance_14mod_'+ssp+'.nc'
     elif ssp=='ssp126':
-        filename = input_path + 'single_models/a_T_mean_std_29mod_'+ssp+'.nc'
+        filename = input_path + 'single_models/a_T_mean_variance_29mod_'+ssp+'.nc'
     elif ssp=='ssp245':
-        filename = input_path + 'single_models/a_T_mean_std_29mod_'+ssp+'.nc'
+        filename = input_path + 'single_models/a_T_mean_variance_29mod_'+ssp+'.nc'
     elif ssp=='ssp370':
-        filename = input_path + 'single_models/a_T_mean_std_30mod_'+ssp+'.nc'
+        filename = input_path + 'single_models/a_T_mean_variance_30mod_'+ssp+'.nc'
     elif ssp=='ssp585':
-        filename = input_path + 'single_models/a_T_mean_std_30mod_'+ssp+'.nc'
+        filename = input_path + 'single_models/a_T_mean_variance_30mod_'+ssp+'.nc'
     else:
         print('Scenario is not valid. Aborting...')
         sys.exit() 
@@ -255,11 +269,14 @@ def modify_obs(obs_temp, glob_temp, coeffs, y_target):
     mod3 = obs_temp.tmean + (coeffs.aam.values * (g.loc[y_target]-g.loc[obs_temp.index]))
     
     # Mean value, against which anomalies are defined
-    mean_series = mod3.loc[slice('1901','2000')].mean()
+    mean_series = mod3.loc[slice('1901','2023')].mean()
 
     
     # Change in variability 
-    srat = (1.+gg*coeffs.aav.values)/(1.+g*coeffs.aav.values)
+    # srat = (1.+gg*coeffs.aav.values)/(1.+g*coeffs.aav.values)
+    ### EDIT 28 November 23 ###
+    # if use the variance, take square root
+    srat = np.sqrt((1.+gg*coeffs.aav.values)/(1.+g*coeffs.aav.values))
     srat =np.maximum(np.minimum(srat,rmax),rmin)
     fmod = mean_series + (mod3-mean_series)*srat     
     
@@ -269,16 +286,14 @@ def modify_obs(obs_temp, glob_temp, coeffs, y_target):
 
 def frsgs(y, valmax, valmin, nbins,):
     
-# This function converts a sample of (original or modified) observations (y)
-# to a continuous SGS probability distribution (f). The corresponding
-# cumulative distribution (cub_prob) is also calculated.
-
+    # This function converts a sample of (original or modified) observations (y)
+    # to a continuous SGS probability distribution (f). The corresponding
+    # cumulative distribution (cub_prob) is also calculated.
     
-# Calculation of mean, standard deviation, skewness and excess kurtosis
-# (using wikipedia formulas; estimate for skewness is only unbiased
-# for symmetric distributions)  
-
-
+        
+    # Calculation of mean, standard deviation, skewness and excess kurtosis
+    # (using wikipedia formulas; estimate for skewness is only unbiased
+    # for symmetric distributions)  
     
     EPS=1e-3
     resol=(valmax-valmin)/(nbins-1)
@@ -308,6 +323,7 @@ def frsgs(y, valmax, valmin, nbins,):
 
     std=np.sqrt((ndata-0.)/(ndata-1.)*m2)
     skew=m3/(std**3.)
+    variance = std**2
     kurt=(ndata+1.)*ndata/((ndata-1.)*(ndata-2.)*(ndata-3.))*ndata*m4/(std**4.) -3*(ndata-1.)*(ndata-1.)/((ndata-2.)*(ndata-3.))
     
     
@@ -324,7 +340,7 @@ def frsgs(y, valmax, valmin, nbins,):
         f[:]=np.nan
         cum_prob[:]=np.nan    
         
-        return f, cum_prob
+        return f, cum_prob, (m1, variance, skew, kurt)
     
     # Calculation of the probability density function, first unnormalized.
     # Note that it is assumed that there is no probability mass beyond the range 
@@ -360,7 +376,7 @@ def frsgs(y, valmax, valmin, nbins,):
         cum_prob[ind]=cum_prob[ind]/cum_prob[nbins-1] 
   
     
-    return f, cum_prob
+    return f, cum_prob, (m1, variance, skew, kurt)
     
 def calculate_sgs_dist(obs_df, y1base, y2base, valmax, valmin, nbins, n_bts):
     
@@ -426,52 +442,44 @@ def calculate_sgs(obs_df, valmax, valmin, nbins):
             temp = list(obs_df.values.squeeze())
         
         
-        f_arr[:,m], cp_arr[:,m] = frsgs(temp, valmax, valmin, nbins)
+        f_arr[:,m], cp_arr[:,m],moments = frsgs(temp, valmax, valmin, nbins)
     
-    return np.squeeze(f_arr), np.squeeze(cp_arr)
+    return np.squeeze(f_arr), np.squeeze(cp_arr), moments
    
     
 
 
 
-def find_intensity_interval(x, prob, cp_arr0, cp_arr, i ):
-    
-    # i = np.round((nbins-1.)*(target_value-valmin)/(valmax-valmin))
-    # cp_df = pd.Series(index=np.arange(0, np.shape(cp_arr0)[1]), dtype=float)
-    
-    
-    # for m in np.arange(0, np.shape(cp_arr)[1]):
-    #     cp = cp_arr[:, m]
-    #     # cpp2 = cp_arr2[:, m]
-    #     # prob2 = cp_arr2[int(i),m]
-    #     t = np.round(np.squeeze(x[np.where(cp == find_nearest(cp,prob))[0]]),1)
-    #     # t2 = np.round(np.squeeze(x[np.where(cp == find_nearest(cp,prob2))[0]]),1)
-    #     # print(t2)
-    #     cp_df[m] = t
+def find_intensity_interval(x, cp_arr0, cp_arr, i ):
         
     test_list =[]
-    prob_list =[]
     for I in np.arange(0, np.shape(cp_arr)[1]):
-        PROB = cp_arr0[int(i),I]
+        PROB = cp_arr0[i,I]
         nearest = find_nearest(cp_arr[:,I],PROB)
         ind = np.where(cp_arr[:,I] == nearest)[0]
         TEMP = np.squeeze(x[ind])
-        prob_list.append(PROB-nearest)
         
         test_list.append(TEMP)
 
     
     return (np.percentile(test_list, 5), np.percentile(test_list, 95), test_list)
 
-def find_difference_interval(x, prob, cp_arr2,cp_arr4):
+def find_difference_interval(x, cp_target_arr,cp_preind_arr, i):
     
-    cp_df = pd.Series(index=np.arange(0, np.shape(cp_arr2)[1]), dtype=float)
-    for m in np.arange(0, np.shape(cp_arr2)[1]):
-        cp2 = cp_arr2[:, m]
-        t2 = np.round(np.squeeze(x[np.where(cp2 == find_nearest(cp2,prob))[0]]),1)
-        cp4 = cp_arr4[:, m]
-        t4 = np.round(np.squeeze(x[np.where(cp4 == find_nearest(cp4,prob))[0]]),1)
+    cp_df = pd.Series(index=np.arange(0, np.shape(cp_target_arr)[1]), dtype=float)
+    for m in np.arange(0, np.shape(cp_target_arr)[1]):
+        cp2 = cp_target_arr[:, m]
+        # Calculate the probability in the present climate
+        PROB = cp2[i]
+        
+        t2 = np.round(np.squeeze(x[np.where(cp2 == find_nearest(cp2,PROB))[0]]),1)
+        cp4 = cp_preind_arr[:, m]
+        
+        t4 = np.round(np.squeeze(x[np.where(cp4 == find_nearest(cp4,PROB))[0]]),1)
+
         if np.sum(np.isfinite(cp2))>0:
             cp_df[m] = t2-t4
     
-    return (np.percentile(cp_df, 5), np.percentile(cp_df, 95))
+    
+    
+    return (np.percentile(cp_df, 5), np.percentile(cp_df, 95), cp_df)
