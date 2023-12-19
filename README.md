@@ -9,16 +9,16 @@ In the Python script distribution_generator.py following parameters are defined:
 
 ```place```
 
-Station (currently "kaisaniemi" or "sodankylä" are available)
-This is the name of the station. This far, only Helsinki Kaisaniemi and Sodankylä Tähtelä are available. The coordinates of the stations and the years available for them are given directly in the script. 
+This is the name of the station. This far, only Helsinki Kaisaniemi "kaisaniemi" and Sodankylä Tähtelä "sodankylä" are available. The coordinates of the stations and the years available for them are given directly in the script. 
 
 ```target_mon```
 
-Target month (1-12) / season (13-16) / annual mean (17) (e.g., 12) 
-This is the month/season/annual for which the probability distributions will be calculated. If Month = 13 / 14 / 15 / 16, the calculations are made for seasonal mean temperatures in winter (DJF) / spring (MAM) / summer (JJA) / autumn (SON). DJF includes the
-December of the previous year. For calculation for the annual mean temperature, use Month = 17.
+Target month (1-12) / season (13-16) / annual mean (17) (e.g., 12). This is the target month/season/annual for which the probability distributions will be calculated. If ```target_mon``` = 13 / 14 / 15 / 16, the calculations are made for seasonal mean temperatures in winter (DJF) / spring (MAM) / summer (JJA) / autumn (SON). DJF includes the December of the previous year. For calculation for the annual mean temperature, use ```target_mon``` = 17.
 
-Target year (e.g., 2022)
+```y_target```
+
+Target year (e.g., 2022). Target year of the calculation.
+
 
 
 Probability of warmer (1) or colder (2) temperatures?
