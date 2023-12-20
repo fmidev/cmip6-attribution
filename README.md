@@ -11,7 +11,7 @@ In the Python script ```distribution_generator.py``` following parameters are de
 
 ```place```
 
-This is the name of the station. This far, only Helsinki Kaisaniemi "kaisaniemi" and Sodankylä Tähtelä "sodankylä" are available. The coordinates of the stations and the years available for them are given directly in the script. 
+This is the name of the station. This far, only Helsinki Kaisaniemi ```place```="kaisaniemi" and Sodankylä Tähtelä ```place```="sodankylä" are available. The coordinates of the stations and the years available for them are given directly in the script. 
 
 ```target_mon```
 
@@ -19,7 +19,7 @@ Target month (1-12) / season (13-16) / annual mean (17) (e.g., 12). This is the 
 
 ```y_target```
 
-Target year (e.g., 2022). Target year of the calculation.
+Target year (e.g., 2022). Target year of the calculation. For September 2023, ```y_target```=2023.
 
 ```y_climate```
 
