@@ -6,8 +6,10 @@ Created on Tue Mar  7 12:56:57 2023
 This script calculates probability distributions of observed monthly temperatures 
 in Helsinki Kaisaniemi and Sodankylä Tähtelä in observed and future climates. 
 
-The methdology is documented in a study which under rewiew for Atmospheric
-Science Letters (Rantanen et al. 2024)
+The methdology is documented in Rantanen et al. (2024):
+A method for estimating the effect of climate change on monthly mean temperatures:
+September 2023 and other recent record-warm months in Helsinki, Finland 
+https://doi.org/10.1002/asl.1216
 
 The main aspects have been also documented in these two papers
 
