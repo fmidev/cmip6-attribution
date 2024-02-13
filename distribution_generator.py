@@ -33,7 +33,7 @@ import subroutines
 """
 First, give the input parameters: place, month, year, and scenario
 """
-# Select place (kaisaniemi or sodankylä)
+# Select station (kaisaniemi or sodankylä)
 place='kaisaniemi'
 
 # Target Month (1-12) / Season (13-16) / Annual mean (17)? (e.g., 12)
@@ -61,7 +61,7 @@ Next, specify some additional parameters used in the calculation
 ################################################################
 """
 
-# first and last of observations used in calculation of probability distributions
+# first and last years of observations used in calculation of probability distributions
 y1base=1901
 y2base=2023
 # Assuming monthly mean temperatures are within -40 ... +40 C
@@ -69,6 +69,7 @@ valmin=-40.0
 valmax=40.0
 nbins=1601
 
+x = np.linspace(valmin, valmax,nbins)
 # Number of bootstrapping in the uncertainty estimate
 n_bts = 1000
 # input path for the datafiles
@@ -85,7 +86,7 @@ Read observed and simulated global temperatures, merge them and
 smooth with 11-year rolling average
 ################################################################
 """
-## READ observed temperature
+## READ observed global temperature
 glob_obs_ds = xr.open_dataset(input_path + 'input_data/HadCRUT5_global_annual.nc')
 glob_obs_temp = glob_obs_ds['tas_mean'].squeeze().sel(time=slice('1850-01-01','2022-12-31'))
 
@@ -95,11 +96,6 @@ glob_temp_mean = subroutines.read_sim_temp_model_mean(input_path, ssp, glob_obs_
 
 # Number of models used in the calculation
 n_mod = len(glob_temp_single.columns)
-
-# Coordinates for Xarray variables
-# coords={'temp': np.linspace(valmin, valmax,nbins),'model': np.arange(0, n_mod),'bootstrap': np.arange(0, n_bts+1)}
-# dims=["temp", "model", "bootstrap"]
-
 
 """
 ################################################################
@@ -160,7 +156,12 @@ f_target, cp_target,moments = subroutines.calculate_sgs(pseudo_obs_target_year_m
 f_future, cp_future,_ = subroutines.calculate_sgs(pseudo_obs_future_year_model_mean.loc[y1base:y2base], valmax, valmin, nbins)
 
 
-# Perform the bootstrapping ##
+"""
+################################################################
+Perform the bootstrapping. This procedure gives the uncertainty related to
+internal climate variability. 
+################################################################
+"""
 
 # Allocate arrays for SGS distributions
 # the first index includes the actual observations (not randomly sampled),
@@ -199,14 +200,6 @@ for b in np.arange(0, n_bts+1):
 
     f_future_3d_arr[:,:,b], cp_future_3d_arr[:,:,b],_ = subroutines.calculate_sgs(pseudo_obs_future_year_single_models.loc[res], valmax, valmin, nbins)
 
-# cp_preind_da = xr.DataArray(cp_preind_3d_arr, coords=coords, dims=dims)
-# cp_target_da = xr.DataArray(cp_target_3d_arr, coords=coords, dims=dims)
-# cp_preind_da = xr.DataArray(cp_preind_3d_arr, coords=coords, dims=dims)
-
-# f_preind = np.mean(np.mean(f_preind_3d_arr[:,:,:], axis=2), axis=1)
-# f_target = np.mean(np.mean(f_target_3d_arr[:,:,:], axis=2), axis=1)
-# f_future = np.mean(np.mean(f_future_3d_arr[:,:,:], axis=2), axis=1)
-
 
 # Reshape 3D arrays into 2D arrays 
 f_preind_arr = f_preind_3d_arr.reshape(*f_preind_3d_arr.shape[:-2], -1)
@@ -234,18 +227,15 @@ if pwarm:
     prob_in_obs_up = 1- np.nanpercentile(cp_obs_arr,95,1)[i]
     prob_in_obs_low = 1- np.nanpercentile(cp_obs_arr,5,1)[i]
     prob_in_preind= 1- cp_preind[i]
-    # prob_in_preind= 1- np.nanmean(cp_preind_3d_arr[i,:,0])
     prob_in_preind_up = 1- np.nanpercentile(cp_preind_arr,95,1)[i]
     prob_in_preind_low = 1- np.nanpercentile(cp_preind_arr,5,1)[i]
     prob_in_target = 1- cp_target[i]
-    # prob_in_target = 1- np.nanmean(cp_target_3d_arr[i,:,0])
     prob_in_target_up = 1- np.nanpercentile(cp_target_arr,95,1)[i]
     prob_in_target_low = 1- np.nanpercentile(cp_target_arr,5,1)[i]
     prob_in_future = 1- cp_future[i]
-    # prob_in_future = 1- np.nanmean(cp_future_3d_arr[i,:,0])
     prob_in_future_up = 1- np.nanpercentile(cp_future_arr,95,1)[i]
     prob_in_future_low = 1- np.nanpercentile(cp_future_arr,5,1)[i]
-    
+
     pr_ratio = prob_in_target / prob_in_preind
     pr_ratio_low = np.nanpercentile((1-cp_target_arr[i,:]) / (1-cp_preind_arr[i,:]), 5)
     pr_ratio_up = np.nanpercentile((1-cp_target_arr[i,:]) / (1-cp_preind_arr[i,:]), 95)
@@ -264,15 +254,37 @@ else:
     prob_in_future_up = np.nanpercentile(cp_future_arr,5,1)[i]
     prob_in_future_low = np.nanpercentile(cp_future_arr,95,1)[i]
 
+    pr_ratio = prob_in_preind / prob_in_target
+    pr_ratio_low = np.nanpercentile((cp_preind_arr[i,:]) / (cp_target_arr[i,:]), 5)
+    pr_ratio_up = np.nanpercentile((cp_preind_arr[i,:]) / (cp_target_arr[i,:]), 95)
+
+
+# Percentile in today's climate
+prob = cp_target[i]
+
+# Calculate corresponding temperatures in other climates
+t_1901 = np.round(np.squeeze(x[np.where(cp_obs == subroutines.find_nearest(cp_obs,prob))[0]]),1)
+t_1900 = np.round(np.squeeze(x[np.where(cp_preind == subroutines.find_nearest(cp_preind,prob))[0]]),1)
+t_2050 = np.round(np.squeeze(x[np.where(cp_future == subroutines.find_nearest(cp_future,prob))[0]]),1)
+
+t1900_lower, t1900_upper,_ = subroutines.find_intensity_interval(x, cp_target_arr, cp_preind_arr, i)
+t2050_lower, t2050_upper,_ = subroutines.find_intensity_interval(x, cp_target_arr, cp_future_arr, i)
+tdiff_lower, tdiff_upper,cp_df = subroutines.find_difference_interval(x, cp_target_arr,cp_preind_arr, i)
+
 print("\nRESULTS\n")
 
+print('Annual probabilities:')
 print(str(y_preind)+':',np.round(prob_in_preind*100,2),'%',np.round(prob_in_preind_up*100,2),np.round(prob_in_preind_low*100,2),'%')
 
 print(str(y_target)+':',np.round(prob_in_target*100,2),'%',np.round(prob_in_target_up*100,2),np.round(prob_in_target_low*100,2),'%')    
 
 print(str(y_climate)+':',np.round(prob_in_future*100,2),'%',np.round(prob_in_future_up*100,2),np.round(prob_in_future_low*100,2),'%')
 
-print('Probability ratio: ',np.round(pr_ratio, 1), np.round(pr_ratio_low, 1), np.round(pr_ratio_up, 1))
+
+print('\nProbability ratio: ',np.round(pr_ratio, 1), '('+str(np.round(pr_ratio_low, 1))+'-'+str(np.round(pr_ratio_up, 1))+')')
+
+print('Change in intensity: '+str(np.round(target_value - t_1900, 1))+'°C', '('+str(np.round(tdiff_lower, 1))+'-'+str(np.round(tdiff_upper, 1))+')')
+
 
 """
 ################################################################
@@ -335,9 +347,9 @@ plt.savefig(figurePath + figureName,dpi=300,bbox_inches='tight')
 
 
 ### 2) distribution plot
-x = np.linspace(valmin, valmax,nbins)
-hist, bin_edges = np.histogram(target_mean.loc[y1base:y2base].values.squeeze(), density=True, 
-                               bins=np.arange(valmin, valmax, 0.5)+0.25)
+
+hist, bin_edges = np.histogram(pseudo_obs_target_year_model_mean.loc[y1base:y2base].values.squeeze(),
+                               density=True,  bins=np.arange(valmin, valmax, 0.5)+0.25)
 
 
 fig, axlist=plt.subplots(nrows=1, ncols=2,figsize=(14,7), dpi=300, sharey=False)
@@ -367,9 +379,9 @@ if pwarm:
     probtext = 'Probability\ of\ T\ ≥\ '+f'{np.round(target_value,1):.1f}°C'
     returntext = 'Return\ period\ of\ T\ ≥\ '+f'{np.round(target_value,1):.1f}°C'
 else:
-    ax2.fill_between(x,f_obs,where = x<=target_value, color='lightblue', zorder=3, alpha=0.7)
-    ax2.fill_between(x,f_preind,where = x<=target_value, color='coral', zorder=4, alpha=0.7)
-    ax2.fill_between(x,f_target,where = x<=target_value, color='lightgrey', zorder=5, alpha=0.7)
+    ax2.fill_between(x,f_preind,where = x<=target_value, color='lightblue', zorder=3, alpha=0.7)
+    ax2.fill_between(x,f_target,where = x<=target_value, color='coral', zorder=4, alpha=0.7)
+    ax2.fill_between(x,f_future,where = x<=target_value, color='lightgrey', zorder=5, alpha=0.7)
     probtext = 'Probability\ of\ T\ ≤\ '+f'{np.round(target_value,1):.1f}°C'
     returntext = 'Return\ period\ of\ T\ ≤\ '+f'{np.round(target_value,1):.1f}°C'
 
@@ -384,17 +396,6 @@ ax1.set_ylabel('Relative frequency / probability density [1/°C]')
 ax1.legend(loc='upper right', frameon=False, ncol=3, bbox_to_anchor=(0.92, 1.1))
 ax2.legend(loc='upper right', frameon=False, ncol=3, bbox_to_anchor=(1, 1.1))
 
-# Percentile in today's climate
-prob = cp_target[i]
-
-# Calculate corresponding temperatures in other climates
-t_1901 = np.round(np.squeeze(x[np.where(cp_obs == subroutines.find_nearest(cp_obs,prob))[0]]),1)
-t_1900 = np.round(np.squeeze(x[np.where(cp_preind == subroutines.find_nearest(cp_preind,prob))[0]]),1)
-t_2050 = np.round(np.squeeze(x[np.where(cp_future == subroutines.find_nearest(cp_future,prob))[0]]),1)
-
-t1900_lower, t1900_upper,_ = subroutines.find_intensity_interval(x, cp_target_arr, cp_preind_arr, i)
-t2050_lower, t2050_upper,_ = subroutines.find_intensity_interval(x, cp_target_arr, cp_future_arr, i)
-tdiff_lower, tdiff_upper,cp_df = subroutines.find_difference_interval(x, cp_target_arr,cp_preind_arr, i)
 
 howtext = 'Change\ in\ intensity\  '
 
@@ -437,8 +438,8 @@ textstr = '\n'.join((
 
 props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 # place a text box in upper left in axes coords
-#ax2.text(1.04, 0.99, textstr, transform=ax.transAxes, fontsize=13,
-#          verticalalignment='top', bbox=props)
+ax2.text(1.04, 0.99, textstr, transform=ax.transAxes, fontsize=13,
+          verticalalignment='top', bbox=props)
 
 # ax.set_title('b) '+subroutines.get_target_text(target_mon)+' temperature distributions' , loc='left', 
 #               fontsize=14)
@@ -455,6 +456,9 @@ figurePath = '/Users/rantanem/Documents/python/cmip6-attribution/figures/'
 figureName = 'dist_plot.png'
    
 plt.savefig(figurePath + figureName,dpi=300,bbox_inches='tight')
+
+
+
 
 
 
@@ -503,6 +507,8 @@ b = ax.boxplot(deltaI, positions=np.arange(0,n_mod), labels=model_names, vert=Fa
                medianprops=medianprops, widths=0.7)
 b2 = ax.boxplot(deltaI_mm,positions=[n_mod], labels=[''], vert=False, showfliers=False, medianprops=medianprops,
                 widths=0.7)
+b3 = ax.boxplot(np.concatenate(deltaI), positions=[n_mod],labels=['MMM'], vert=False, showfliers=False,  
+                patch_artist=True,medianprops=medianprops_mm,whis=(5,95), widths=0.7, boxprops=boxprops)
 
 ax.set_xlim(0, 3)
 ax.set_xlabel('Change in intensity [°C]')

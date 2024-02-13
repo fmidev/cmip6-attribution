@@ -74,7 +74,7 @@ def read_obs_temp(input_path, place, target_mon):
         all_obs_months = pd.DataFrame(data=all_obs_months, columns=['tmean'])
         
     elif place=='sodankylä':
-        filename=input_path + 'input_data/sodankylä_kklämpötilat.csv'
+        filename=input_path + 'input_data/sodankyla_monthly_temperatures.csv'
         local_temp_ds = pd.read_csv(filename, index_col=0)
         all_obs_months = local_temp_ds.stack(dropna=False)
         all_obs_months.index = pd.to_datetime(all_obs_months.index.get_level_values(0).astype(str)  + all_obs_months.index.get_level_values(1), format='%Y%b')
@@ -107,7 +107,7 @@ def read_obs_temp(input_path, place, target_mon):
         obs_temp = all_obs_months.rolling(window=3).mean()[all_obs_months.index.month==11].loc[slice('1850-01-01','2023-12-31')]
         obs_temp.index = obs_temp.index.year
     elif target_mon==17:
-        obs_temp = all_obs_months.groupby(all_obs_months.index.year).apply(lambda g: g.mean(skipna=False)).loc[1850:2022]
+        obs_temp = all_obs_months.groupby(all_obs_months.index.year).apply(lambda g: g.mean(skipna=False)).loc[1850:2023]
     if target_mon>17:
         import sys;
         print('Target month is not valid. Please select between 1 and 17. Aborting.')
@@ -473,9 +473,11 @@ def find_difference_interval(x, cp_target_arr,cp_preind_arr, i):
         PROB = cp2[i]
         
         t2 = np.round(np.squeeze(x[np.where(cp2 == find_nearest(cp2,PROB))[0]]),1)
+        t2 = np.squeeze(x[np.where(cp2 == find_nearest(cp2,PROB))[0]])
         cp4 = cp_preind_arr[:, m]
         
         t4 = np.round(np.squeeze(x[np.where(cp4 == find_nearest(cp4,PROB))[0]]),1)
+        t4 = np.squeeze(x[np.where(cp4 == find_nearest(cp4,PROB))[0]])
 
         if np.sum(np.isfinite(cp2))>0:
             cp_df[m] = t2-t4
