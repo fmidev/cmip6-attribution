@@ -169,19 +169,22 @@ def read_sim_temp_single_models(input_path, ssp, glob_obs_temp):
         print('Scenario is not valid. Aborting...')
         sys.exit() 
     
-    ## READ simulated temperature
+    ## READ simulated temperature and smooth with 11-year rolling mean
     tglob_sim_ds = xr.open_dataset(filename)
     tglob_sim_temp = tglob_sim_ds.dt.squeeze().rename('t')
+    tglob_sim_temp['time'] = tglob_sim_ds.time.dt.year
+    tglob_sim_smooth = tglob_sim_temp.rolling(time=11, center=True, min_periods=1).mean()
     
-    # merge observed and simulated global temperature
-    diff = glob_obs_temp[-1] - tglob_sim_temp.sel(time='2022-01-01')
-    glob_temp = xr.concat([glob_obs_temp, tglob_sim_temp.sel(time=slice('2023-01-01','2100-12-31'))+diff], 
-                          dim='time')
+    # smooth observed temperature with 11-year rolling mean
+    glob_obs_smooth = glob_obs_temp.rolling(time=11, center=True, min_periods=1).mean()
+    # find the last valid year. Minus 5 is because that's half of 11
+    last_valid_idx = glob_obs_smooth.time.values[-1] - 5 
 
-
-    # smooth with 11-year running average
-    glob_temp_smooth = glob_temp.rolling(time=11, center=True, min_periods=1).mean()
-    glob_temp_smooth['time'] = glob_temp_smooth.time.dt.year
+    # merge observed and simulated global temperature at -5 year
+    diff = glob_obs_smooth.sel(time=last_valid_idx) - tglob_sim_smooth.sel(time=last_valid_idx)
+    glob_temp_smooth = xr.concat([glob_obs_smooth.sel(time=slice(None,last_valid_idx)), 
+                                  tglob_sim_smooth.sel(time=slice(last_valid_idx + 1,None))+diff], 
+                                 dim='time')
 
     # Select year 2000 as baseline
     glob_temp_smooth = glob_temp_smooth - glob_temp_smooth.sel(time=2000)
@@ -211,19 +214,22 @@ def read_sim_temp_model_mean(input_path, ssp, glob_obs_temp):
         print('Scenario is not valid. Aborting...')
         sys.exit() 
     
-    ## READ simulated temperature
+    ## READ simulated temperature and smooth with 11-year rolling mean
     tglob_sim_ds = xr.open_dataset(filename)
     tglob_sim_temp = tglob_sim_ds.dt.squeeze().rename('t')
+    tglob_sim_temp['time'] = tglob_sim_ds.time.dt.year
+    tglob_sim_smooth = tglob_sim_temp.rolling(time=11, center=True, min_periods=1).mean()
+    
+    # smooth observed temperature with 11-year rolling mean
+    glob_obs_smooth = glob_obs_temp.rolling(time=11, center=True, min_periods=1).mean()
+    # find the last valid year. Minus 5 is because that's half of 11
+    last_valid_idx = glob_obs_smooth.time.values[-1] - 5
     
     # merge observed and simulated global temperature
-    diff = glob_obs_temp[-1] - tglob_sim_temp.sel(time='2022-01-01')
-    glob_temp = xr.concat([glob_obs_temp, tglob_sim_temp.sel(time=slice('2023-01-01','2100-12-31'))+diff], 
-                          dim='time')
-
-
-    # smooth with 11-year running average
-    glob_temp_smooth = glob_temp.rolling(time=11, center=True, min_periods=1).mean()
-    glob_temp_smooth['time'] = glob_temp_smooth.time.dt.year
+    diff = glob_obs_smooth.sel(time=last_valid_idx) - tglob_sim_smooth.sel(time=last_valid_idx)
+    glob_temp_smooth = xr.concat([glob_obs_smooth.sel(time=slice(None,last_valid_idx)), 
+                                  tglob_sim_smooth.sel(time=slice(last_valid_idx + 1,None))+diff], 
+                                 dim='time')
 
     # Select year 2000 as baseline
     glob_temp_smooth = glob_temp_smooth - glob_temp_smooth.sel(time=2000)
@@ -231,6 +237,7 @@ def read_sim_temp_model_mean(input_path, ssp, glob_obs_temp):
 
     # convert to dataframe
     glob_temp_smooth = glob_temp_smooth.astype(float).drop_vars(('lat','lon')).to_pandas()
+    
     
     return glob_temp_smooth
 
