@@ -10,6 +10,44 @@ import xarray as xr
 import numpy as np
 import pandas as pd
 
+def get_station_metadata(fmisid):
+
+    params = ['time','stationname', 'longitude','latitude','tmon']
+
+    starttime= pd.to_datetime('2023-01-01').strftime('%Y%m%d')
+    endtime= pd.to_datetime('2023-02-01').strftime('%Y%m%d')
+
+    print('Downloading coordinates for', fmisid)
+    url = f'http://smartmet.fmi.fi/timeseries?format=ascii&starttime={starttime}0000&endtime={endtime}2359&' + \
+          f'fmisid={fmisid}&producer=opendata_daily&precision=double&' + \
+          f'param={",".join(params)}&separator=,&tz=UTC&groupareas=0'
+    try:
+        df = pd.read_csv(url, names=params, parse_dates=[0], index_col='time').ffill(limit=6)
+    except:
+        print('FAILED')
+
+    return df['latitude'][0],df['longitude'][0], df['stationname'][0]
+
+def read_monthly_temps_from_smartmet(fmisid):
+
+    params = ['time','stationname', 'tmon']
+
+
+    starttime= pd.to_datetime('1901-01-01').strftime('%Y%m%d')
+    endtime= pd.to_datetime('today').normalize().strftime('%Y%m%d')
+
+    print('Downloading data for', fmisid)
+    url = f'http://smartmet.fmi.fi/timeseries?format=ascii&starttime={starttime}0000&endtime={endtime}2359&' + \
+          f'fmisid={fmisid}&producer=opendata_daily&precision=double&' + \
+          f'param={",".join(params)}&separator=,&tz=UTC&groupareas=0'
+    try:
+        df = pd.read_csv(url, names=params, parse_dates=[0], index_col='time')
+    except:
+        print('FAILED')
+
+    return df['tmon']
+
+
 def find_nearest(array, value):
     array = np.asarray(array)
     diff = np.abs(array - value)
@@ -63,51 +101,44 @@ def get_target_text(target_mon):
                    17:'Year'}
     return target_text[target_mon]
 
-def read_obs_temp(input_path, place, target_mon):
-    
-    if place=='kaisaniemi':
+def read_obs_temp(input_path, fmisid, target_mon):
+
+    # read raw observations from Smartmet
+    all_obs_months = read_monthly_temps_from_smartmet(fmisid)
+
+    # If Hel Kaisaniemi, use adjusted observations for the 20th century 
+    # and concat with raw observations
+    if fmisid==100971:
+        print('Downloading adjusted observations...')
         filename=input_path + 'input_data/HKI_T_R_ori-adj.xls'
         local_temp_ds = pd.read_excel(filename, sheet_name='HKI-Tadj', index_col=0)/10
-        all_obs_months = local_temp_ds.stack(dropna=False)
-        all_obs_months.index = pd.to_datetime(all_obs_months.index.get_level_values(0).astype(str)  + all_obs_months.index.get_level_values(1), format='%Y%b')
+        all_obs_months_adj = local_temp_ds.stack(dropna=False)
+        all_obs_months_adj.index = pd.to_datetime(all_obs_months_adj.index.get_level_values(0).astype(str)  + all_obs_months_adj.index.get_level_values(1), format='%Y%b')
         
-        all_obs_months = pd.DataFrame(data=all_obs_months, columns=['tmean'])
+        # select only 20th century observations from adjusted values
+        all_obs_months_adj = all_obs_months_adj.loc[slice('1901','1999')]
         
-    elif place=='sodankylä':
-        filename=input_path + 'input_data/sodankyla_monthly_temperatures.csv'
-        local_temp_ds = pd.read_csv(filename, index_col=0)
-        all_obs_months = local_temp_ds.stack(dropna=False)
-        all_obs_months.index = pd.to_datetime(all_obs_months.index.get_level_values(0).astype(str)  + all_obs_months.index.get_level_values(1), format='%Y%b')
-        
-        all_obs_months = pd.DataFrame(data=all_obs_months, columns=['tmean'])
-        
-    elif place=='finland':
-        filename='/Users/rantanem/Downloads/Suomi_hila_data.xlsx'
-        local_temp_ds = pd.read_excel('/Users/rantanem/Downloads/Suomi_hiladata.xlsx', engine='openpyxl',
-                                      index_col=0)
-        all_obs_months = local_temp_ds.iloc[:,6:18].stack(dropna=False)
-        all_obs_months.index = pd.to_datetime(all_obs_months.index.get_level_values(0).astype(str)  + all_obs_months.index.get_level_values(1), format='%Y%b')
-        
-        all_obs_months = pd.DataFrame(data=all_obs_months, columns=['tmean'])
+        # concat with smartmet data
+        all_obs_months = all_obs_months_adj.combine_first(all_obs_months)
     
 
     if target_mon<=12:
-        obs_temp = all_obs_months[all_obs_months.index.month==target_mon].loc[slice('1850-01-01','2023-12-31')]
+        obs_temp = all_obs_months[all_obs_months.index.month==target_mon].loc[slice('1850-01-01',None)]
         obs_temp.index = obs_temp.index.year
     elif target_mon==13:
-        obs_temp = all_obs_months.rolling(window=3).mean()[all_obs_months.index.month==2].loc[slice('1850-01-01','2023-12-31')]
+        obs_temp = all_obs_months.rolling(window=3).mean()[all_obs_months.index.month==2].loc[slice('1850-01-01',None)]
         obs_temp.index = obs_temp.index.year
     elif target_mon==14:
-        obs_temp = all_obs_months.rolling(window=3).mean()[all_obs_months.index.month==5].loc[slice('1850-01-01','2023-12-31')]
+        obs_temp = all_obs_months.rolling(window=3).mean()[all_obs_months.index.month==5].loc[slice('1850-01-01',None)]
         obs_temp.index = obs_temp.index.year
     elif target_mon==15:
-        obs_temp = all_obs_months.rolling(window=3).mean()[all_obs_months.index.month==8].loc[slice('1850-01-01','2023-12-31')]
+        obs_temp = all_obs_months.rolling(window=3).mean()[all_obs_months.index.month==8].loc[slice('1850-01-01',None)]
         obs_temp.index = obs_temp.index.year
     elif target_mon==16:
-        obs_temp = all_obs_months.rolling(window=3).mean()[all_obs_months.index.month==11].loc[slice('1850-01-01','2023-12-31')]
+        obs_temp = all_obs_months.rolling(window=3).mean()[all_obs_months.index.month==11].loc[slice('1850-01-01',None)]
         obs_temp.index = obs_temp.index.year
     elif target_mon==17:
-        obs_temp = all_obs_months.groupby(all_obs_months.index.year).apply(lambda g: g.mean(skipna=False)).loc[1850:2023]
+        obs_temp = all_obs_months.groupby(all_obs_months.index.year).apply(lambda g: g.mean(skipna=False)).loc[1850:]
     if target_mon>17:
         import sys;
         print('Target month is not valid. Please select between 1 and 17. Aborting.')
@@ -260,13 +291,13 @@ def modify_obs(obs_temp, glob_temp, coeffs, y_target):
     rmin=1./rmax
     # smoothed global mean temperature (relative to year 2000)
     g = glob_temp
-    g.name=obs_temp.columns.values[0]
+    g.name=obs_temp.name
         
     # smoothed global mean T in target year
     gg = g.loc[y_target]
     
     # Calculation of the intermediate values, with changes is mean only
-    mod3 = obs_temp.tmean + (coeffs.aam.values * (g.loc[y_target]-g.loc[obs_temp.index]))
+    mod3 = obs_temp + (coeffs.aam.values * (g.loc[y_target]-g.loc[obs_temp.index]))
     
     # Mean value, against which anomalies are defined
     mean_series = mod3.loc[slice('1901','2023')].mean()
@@ -280,7 +311,7 @@ def modify_obs(obs_temp, glob_temp, coeffs, y_target):
     srat =np.maximum(np.minimum(srat,rmax),rmin)
     fmod = mean_series + (mod3-mean_series)*srat     
     
-    return fmod.loc[obs_temp.index[0]:obs_temp.index[-1]]
+    return fmod.loc[obs_temp.index]
 
 
 
@@ -326,11 +357,21 @@ def frsgs(y, valmax, valmin, nbins,):
     variance = std**2
     kurt=(ndata+1.)*ndata/((ndata-1.)*(ndata-2.)*(ndata-3.))*ndata*m4/(std**4.) -3*(ndata-1.)*(ndata-1.)/((ndata-2.)*(ndata-3.))
     
+    if kurt < 3./2.*(skew**2.):
+          kurt=3./2.*(skew**2.)+EPS
+  
     
     #  SGS parameters using Eqs. 8a-8c in Sardesmukh et al. 2015
     # (J. Climate, 28, 9166-9187)
     
-    e2=np.maximum(2./3.*(kurt-3./2.*(skew**2.)/(kurt+2-(skew**2.))),1.-1./np.sqrt(1+(skew**2.)/4.)+EPS) 
+    # e2=np.maximum(2./3.*(kurt-3./2.*(skew**2.)/(kurt+2-(skew**2.))),
+    #               1.-1./np.sqrt(1+(skew**2.)/4.)+EPS) 
+
+    e2=np.maximum(np.maximum(2./3.*(kurt-3./2.*(skew**2.)/(kurt+2-(skew**2.))),\
+           1.-1./np.sqrt(1+(skew**2.)/4.)+EPS),EPS)
+
+    if (e2 > 2./3.):
+          e2=2./3.*(1.-EPS)
 
     
     g=skew*std*(1.-e2)/(2*np.sqrt(e2))
@@ -456,7 +497,7 @@ def find_intensity_interval(x, cp_arr0, cp_arr, i ):
     for I in np.arange(0, np.shape(cp_arr)[1]):
         PROB = cp_arr0[i,I]
         nearest = find_nearest(cp_arr[:,I],PROB)
-        ind = np.where(cp_arr[:,I] == nearest)[0]
+        ind = np.where(cp_arr[:,I] == nearest)[0][0]
         TEMP = np.squeeze(x[ind])
         
         test_list.append(TEMP)
@@ -472,12 +513,12 @@ def find_difference_interval(x, cp_target_arr,cp_preind_arr, i):
         # Calculate the probability in the present climate
         PROB = cp2[i]
         
-        t2 = np.round(np.squeeze(x[np.where(cp2 == find_nearest(cp2,PROB))[0]]),1)
-        t2 = np.squeeze(x[np.where(cp2 == find_nearest(cp2,PROB))[0]])
+        # t2 = np.round(np.squeeze(x[np.where(cp2 == find_nearest(cp2,PROB))[0]]),1)
+        t2 = np.squeeze(x[np.where(cp2 == find_nearest(cp2,PROB))[0]][0])
         cp4 = cp_preind_arr[:, m]
         
-        t4 = np.round(np.squeeze(x[np.where(cp4 == find_nearest(cp4,PROB))[0]]),1)
-        t4 = np.squeeze(x[np.where(cp4 == find_nearest(cp4,PROB))[0]])
+        # t4 = np.round(np.squeeze(x[np.where(cp4 == find_nearest(cp4,PROB))[0]]),1)
+        t4 = np.squeeze(x[np.where(cp4 == find_nearest(cp4,PROB))[0]][0])
 
         if np.sum(np.isfinite(cp2))>0:
             cp_df[m] = t2-t4
