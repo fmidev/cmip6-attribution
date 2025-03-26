@@ -35,14 +35,17 @@ import subroutines
 """
 First, give the input parameters: place, month, year, and scenario
 """
-# Select station (kaisaniemi or sodankylä)
-place='kaisaniemi'
+# Select FMI station ID. The data is downloaded from FMI internal smartmet server
+# Helsinki Kaisaniemi: 100971
+# Sodankylä Tähtelä: 101932
+# Parainen Utö: 100908
+fmisid=100971
 
 # Target Month (1-12) / Season (13-16) / Annual mean (17)? (e.g., 12)
-target_mon = 9
+target_mon = 3
 
 # Target year
-y_target = 2023
+y_target = 2025
 
 # Future climate year
 y_climate = 2050
@@ -65,7 +68,7 @@ Next, specify some additional parameters used in the calculation
 
 # first and last years of observations used in calculation of probability distributions
 y1base=1901
-y2base=2023
+y2base=2024
 # Assuming monthly mean temperatures are within -40 ... +40 C
 valmin=-40.0
 valmax=40.0
@@ -76,11 +79,10 @@ x = np.linspace(valmin, valmax,nbins)
 n_bts = 1000
 # input path for the datafiles
 input_path = '/Users/rantanem/Documents/python/cmip6-attribution/'
-# lat/lon coordinates
-latlon = {'kaisaniemi':(60.2,25.0),
-          'sodankylä':(67.4,26.6),
-          'finland':(64.1,26.0)}
-
+# lat/lon coordinates + station name
+metadata = subroutines.get_station_metadata(fmisid)
+latlon = metadata[:2]
+sname = metadata[2]
 
 """
 ################################################################
@@ -106,13 +108,13 @@ for the Tglob-regressed changes in mean and variability
 ################################################################
 """
 #### A) Observed local temperatures  
-obs_temp = subroutines.read_obs_temp(input_path, place, target_mon).loc[1901:]
+obs_temp = subroutines.read_obs_temp(input_path, fmisid, target_mon).loc[1901:]
 
 
 ### B) The coefficients for the Tglob-regressed changes in mean and variability
 ###    The GrADS binary file includes (somewhat illogically) for each 17 seasons
-coeffs_single = subroutines.read_coeffs_single_models(input_path,ssp, target_mon, latlon[place][0], latlon[place][1])
-coeffs_mean = subroutines.read_coeffs_model_mean(input_path,ssp, target_mon, latlon[place][0], latlon[place][1])
+coeffs_single = subroutines.read_coeffs_single_models(input_path,ssp, target_mon, latlon[0], latlon[1])
+coeffs_mean = subroutines.read_coeffs_model_mean(input_path,ssp, target_mon, latlon[0], latlon[1])
 """
 ################################################################
 Everything has been read in. Next, recalculate the observed time series    
@@ -219,7 +221,7 @@ Print the probabilities of warmer/colder temperatures
 ################################################################
 """
 # The observed temperature (i.e. the target value)
-target_value = obs_temp.tmean.loc[y_target].round(2)
+target_value = obs_temp.loc[y_target].round(2)
 # The corresponding index
 i=int((nbins-1.)*(target_value-valmin)/(valmax-valmin))
 
@@ -301,7 +303,7 @@ font = {'weight' : 'normal',
 import matplotlib
 matplotlib.rc('font', **font)
 # Define texts for the plots
-place_text = subroutines.get_place_text(place)
+place_text = sname
 target_text = subroutines.get_target_text(target_mon) + ' '+str(y_target)
 
 
@@ -318,8 +320,8 @@ preind_up = pseudo_obs_preind_year_single_models.quantile(0.95, axis=1).loc[slic
 preind_low = pseudo_obs_preind_year_single_models.quantile(0.05, axis=1).loc[slice(str(y1base),str(y_target))]
 
 # Define error bars
-y_l = np.array(target_mean) - np.array(target_low)
-y_u =np.array(target_up) - np.array(target_mean)
+y_l = np.round(np.array(target_mean) - np.array(target_low),6)
+y_u = np.round(np.array(target_up) - np.array(target_mean),6)
 errors = [y_l, y_u]
 
 
@@ -330,7 +332,7 @@ ax.plot(obs_temp_plot.index,obs_temp_plot, color='k', linewidth=1.5, label='Obse
 ax.scatter(target_mean.index, target_mean, label='Pseudo-observations')
 ax.errorbar(target_mean.index, target_mean, yerr=errors, fmt='o', ecolor = 'red')
 
-ax.axhline(y=obs_temp_plot['tmean'].loc[y_target], linestyle='--')
+ax.axhline(y=obs_temp_plot.loc[y_target], linestyle='--')
 
 ax.set_ylabel('Temperature [°C]')
 # ax.set_ylim(7,17.2)
@@ -339,7 +341,7 @@ ax.tick_params(axis='both', which='major',)
 ax.legend(frameon=False, loc='upper center', bbox_to_anchor=(0.5, 1.09),ncol=2,)
 # ax.set_title('a) '+subroutines.get_target_text(target_mon)+' temperatures' , loc='left', 
 #              fontsize=14)
-ax.set_xlim(1900, 2024)
+ax.set_xlim(1900, y_target+1)
 
 figurePath = '/Users/rantanem/Documents/python/cmip6-attribution/figures/'
 figureName = 'timeser_plot.png'
@@ -389,17 +391,17 @@ else:
 
 # ax.tick_params(axis='both', which='major')
 for ax in axlist:
-    ax.set_xticks(np.arange(valmin, valmax, 2))
-    ax.set_xlim(np.floor(np.nanmin(obs_temp.loc[y1base:y2base].values.squeeze()))-3,np.ceil(np.nanmax(obs_temp.tmean))+4)
+    ax.set_xticks(np.arange(valmin, valmax, 4))
+    ax.set_xlim(np.floor(np.nanmin(obs_temp.loc[y1base:y2base].values.squeeze()))-3,np.ceil(np.nanmax(obs_temp))+4)
     ax.set_xlabel('Temperature [°C]')
     ax.grid(True, zorder=1)
-    ax.set_ylim(0, 0.35)
+    ax.set_ylim(0, 0.3)
 ax1.set_ylabel('Relative frequency / probability density [1/°C]')
 ax1.legend(loc='upper right', frameon=False, ncol=3, bbox_to_anchor=(0.92, 1.1))
 ax2.legend(loc='upper right', frameon=False, ncol=3, bbox_to_anchor=(1, 1.1))
 
 
-howtext = 'Change\ in\ intensity\  '
+howtext = 'Intensity\  '
 
 textstr = '\n'.join((
     place_text,
@@ -417,8 +419,8 @@ textstr = '\n'.join((
     f'{np.round(prob_in_future_up*100,1):.1f}-'+f'{np.round(prob_in_future_low*100,1):.1f}) %',
     '',
     r"$\bf{"+returntext+"}$",
-    str(y1base)+'-'+str(y2base)+': '+f'{np.round(1/prob_in_obs,0):.0f} ('+\
-    f'{np.round(1/prob_in_obs_low,0):.0f}-'+f'{np.round(1/prob_in_obs_up,0):.0f}) years',
+    # str(y1base)+'-'+str(y2base)+': '+f'{np.round(1/prob_in_obs,0):.0f} ('+\
+    # f'{np.round(1/prob_in_obs_low,0):.0f}-'+f'{np.round(1/prob_in_obs_up,0):.0f}) years',
     '',
     "\'"+str(y_preind)+"\'"+': '+f'{np.round(1/prob_in_preind,0):.0f} (' +\
     f'{np.round(1/prob_in_preind_low,0):.0f}-'+f'{np.round(1/prob_in_preind_up,0):.0f}) years',
@@ -428,7 +430,7 @@ textstr = '\n'.join((
     f'{np.round(1/prob_in_future_low,0):.0f}-'+f'{np.round(1/prob_in_future_up,0):.0f}) years',
     '',
     r"$\bf{"+howtext+"}$",
-    str(y1base)+'-'+str(y2base)+': '+f'{t_1901:.1f}°C',
+    # str(y1base)+'-'+str(y2base)+': '+f'{t_1901:.1f}°C',
     '',
     "\'"+str(y_preind)+"\'"+': '+f'{t_1900:.1f}°C ({t1900_lower:.1f}-{t1900_upper:.1f})°C',
     "\'"+str(y_target)+"\'"+': '+f'{target_value:.1f}°C',
@@ -491,9 +493,11 @@ a2b = ax.boxplot(pr_ratio_bp, positions=[n_mod], labels=[''],vert=False, showfli
                 medianprops=medianprops,whis=(5,95), widths=0.7)
 
 ax.yaxis.tick_right()
-ax.set_xlim(1, 1000)
+ax.set_xlim(1, 10000)
+
 ax.set_xlabel('Probability ratio')
 ax.set_xscale('log')
+ax.set_xticks(ticks=[1,10,100,1000,10000,100000])
 ax.invert_yaxis()
 
 
@@ -512,10 +516,38 @@ b2 = ax.boxplot(deltaI_mm,positions=[n_mod], labels=[''], vert=False, showfliers
 b3 = ax.boxplot(np.concatenate(deltaI), positions=[n_mod],labels=['MMM'], vert=False, showfliers=False,  
                 patch_artist=True,medianprops=medianprops_mm,whis=(5,95), widths=0.7, boxprops=boxprops)
 
-ax.set_xlim(0, 3)
+ax.set_xlim(0, 4)
 ax.set_xlabel('Change in intensity [°C]')
 
 figurePath = '/Users/rantanem/Documents/python/cmip6-attribution/figures/'
 figureName = 'model_stats.png'
    
 plt.savefig(figurePath + figureName,dpi=300,bbox_inches='tight')
+
+
+
+"""
+################################################################
+Finally, calculate various percentiles for the distribution
+################################################################
+"""
+
+
+def calculate_percentiles(f, arr, x):
+
+    preind_mmm = pd.Series(f, index=x).rename('MMM')
+    preind_50 = pd.DataFrame(arr, index=x).median(axis=1).rename('50')
+    preind_25 = pd.DataFrame(arr, index=x).quantile(0.25, axis=1).rename('25')
+    preind_75 = pd.DataFrame(arr, index=x).quantile(0.75, axis=1).rename('75')
+    preind_05 = pd.DataFrame(arr, index=x).quantile(0.05, axis=1).rename('5')
+    preind_95 = pd.DataFrame(arr, index=x).quantile(0.95, axis=1).rename('95')
+    preind_025 = pd.DataFrame(arr, index=x).quantile(0.025, axis=1).rename('2.5')
+    preind_975 = pd.DataFrame(arr, index=x).quantile(0.975, axis=1).rename('97.5')
+    out = pd.concat([preind_mmm, preind_50, preind_25, preind_75,
+                            preind_05, preind_95, preind_025, preind_975], axis=1)
+
+    return out
+
+out_preind = calculate_percentiles(f_preind, f_preind_arr, x)
+out_target = calculate_percentiles(f_target, f_target_arr, x)
+out_future = calculate_percentiles(f_future, f_future_arr, x)
