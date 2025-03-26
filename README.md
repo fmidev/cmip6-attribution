@@ -9,9 +9,9 @@ The method is documented in Rantanen et al. (2024). A method for estimating the 
 
 In the Python script ```distribution_generator.py``` following parameters are defined:
 
-```place```
+```fmisid```
 
-This is the name of the station. This far, only Helsinki Kaisaniemi ```place```="kaisaniemi" and Sodankylä Tähtelä ```place```="sodankylä" are available. The coordinates of the stations and the years available for them are given directly in the script. 
+This is the FMISID of the station. Based on this ID, the program reads monthly mean temperatures for the station. Currently, all FMI weather stations in Finland are available. Note: this works only within FMI internal network. If you are not in FMI internal network, you need replace the reading of station data by reading it locally from your device. 
 
 ```target_mon```
 
