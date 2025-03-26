@@ -3,7 +3,7 @@ This repository contains Python software to calculate probability distributions 
 (1) time series of global mean temperature and 
 (2) cmip6-based coefficients for the changes in the local mean temperature and temperature variance normalized by the global mean temperature.
 
-The method is documented in an upcoming study Rantanen et al. (2023, under review in ASL).
+The method is documented in Rantanen et al. (2024). A method for estimating the effect of climate change on monthly mean temperatures: September 2023 and other recent record-warm months in Helsinki, Finland. Atmospheric Science Letters, 25(6), e1216. https://doi.org/10.1002/asl.1216
 
 ## Input parameters
 
