@@ -307,15 +307,14 @@ def modify_obs(obs_temp, glob_temp, coeffs, y_target):
     mod3 = obs_temp + (coeffs.aam.values * (g.loc[y_target]-g.loc[obs_temp.index]))
     
     # Mean value, against which anomalies are defined
-    mean_series = mod3.loc[slice('1901','2023')].mean()
-
+    mean_series = mod3.loc[slice('1901',None)].mean()
     
     # Change in variability 
     # srat = (1.+gg*coeffs.aav.values)/(1.+g*coeffs.aav.values)
     ### EDIT 28 November 23 ###
     # if use the variance, take square root
     srat = np.sqrt((1.+gg*coeffs.aav.values)/(1.+g*coeffs.aav.values))
-    srat =np.maximum(np.minimum(srat,rmax),rmin)
+    srat = np.maximum(np.minimum(srat,rmax),rmin)
     fmod = mean_series + (mod3-mean_series)*srat     
     
     return fmod.loc[obs_temp.index]
