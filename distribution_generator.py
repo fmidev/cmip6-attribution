@@ -42,10 +42,10 @@ First, give the input parameters: place, month, year, and scenario
 fmisid=100971
 
 # Target Month (1-12) / Season (13-16) / Annual mean (17)? (e.g., 12)
-target_mon = 3
+target_mon = 1
 
 # Target year
-y_target = 2025
+y_target = 2024
 
 # Future climate year
 y_climate = 2050
@@ -91,8 +91,9 @@ smooth with 11-year rolling average
 ################################################################
 """
 ## READ observed global temperature
-glob_obs_ds = xr.open_dataset(input_path + 'input_data/HadCRUT5_global_annual.nc')
-glob_obs_temp = glob_obs_ds['tas_mean'].squeeze().sel(time=slice('1850-01-01','2022-12-31'))
+glob_obs_ds = xr.open_dataset(input_path + 'input_data/HadCRUT.5.0.2.0.analysis.summary_series.global.annual.nc')
+glob_obs_temp = glob_obs_ds['tas_mean'].squeeze().sel(time=slice('1850-01-01','2024-12-31'))
+glob_obs_temp['time'] = glob_obs_temp.time.dt.year
 
 ## READ simulated temperature, merge it with observed temperature and smooth with 11-year moving average
 glob_temp_single = subroutines.read_sim_temp_single_models(input_path, ssp, glob_obs_temp)
