@@ -5,6 +5,10 @@ This repository contains Python software to calculate probability distributions 
 
 The method is documented in Rantanen et al. (2024): A method for estimating the effect of climate change on monthly mean temperatures: September 2023 and other recent record-warm months in Helsinki, Finland. Atmospheric Science Letters, 25(6), e1216. https://doi.org/10.1002/asl.1216
 
+## Preparing the input data
+
+1. Calculation of the covariate (11-year global mean temperature) and CMIP6-based regression coefficients
+
 ## Input parameters
 
 In the Python script ```distribution_generator.py``` following parameters are defined:
