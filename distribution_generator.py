@@ -113,7 +113,6 @@ obs_temp = subroutines.read_obs_temp(input_path, fmisid, target_mon).loc[1901:]
 
 
 ### B) The coefficients for the Tglob-regressed changes in mean and variability
-###    The GrADS binary file includes (somewhat illogically) for each 17 seasons
 coeffs_single = subroutines.read_coeffs_single_models(input_path,ssp, target_mon, latlon[0], latlon[1])
 coeffs_mean = subroutines.read_coeffs_model_mean(input_path,ssp, target_mon, latlon[0], latlon[1])
 """
@@ -130,9 +129,9 @@ pseudo_obs_future_year_single_models = pd.DataFrame(index=obs_temp.index, column
 
 for m in glob_temp_single.columns:
     
-    pseudo_obs_preind_year_single_models[m] = subroutines.modify_obs(obs_temp, glob_temp_single[m], coeffs_single.sel(lev=m), y_preind)
-    pseudo_obs_target_year_single_models[m] = subroutines.modify_obs(obs_temp, glob_temp_single[m], coeffs_single.sel(lev=m), y_target)
-    pseudo_obs_future_year_single_models[m] = subroutines.modify_obs(obs_temp, glob_temp_single[m], coeffs_single.sel(lev=m), y_climate)
+    pseudo_obs_preind_year_single_models[m] = subroutines.modify_obs(obs_temp, glob_temp_single[m], coeffs_single.sel(model=m), y_preind)
+    pseudo_obs_target_year_single_models[m] = subroutines.modify_obs(obs_temp, glob_temp_single[m], coeffs_single.sel(model=m), y_target)
+    pseudo_obs_future_year_single_models[m] = subroutines.modify_obs(obs_temp, glob_temp_single[m], coeffs_single.sel(model=m), y_climate)
     
 # Calculate multi-model-mean
 pseudo_obs_preind_year_model_mean = subroutines.modify_obs(obs_temp, glob_temp_mean, coeffs_mean, y_preind)
@@ -374,7 +373,7 @@ ax1.bar(bin_edges[:-1]+0.25,hist,
         width=0.4, edgecolor='k', facecolor='skyblue', zorder=2, label="Pseudo-observations \'"+str(y_target)+"\'", alpha=0.7)
 
 ax2.axvline(x=target_value, zorder=10, color='k')
-ax2.annotate(f'{np.round(target_value,1):.1f}°C', xy=(target_value-0.1,ax2.get_ylim()[1]), xycoords='data',
+ax2.annotate(f'{np.round(target_value,1):.1f}°C', xy=(target_value-0.1,ax2.get_ylim()[1]+0.1), xycoords='data',
             rotation=90, ha='right', va='top')
 
 if pwarm:
@@ -396,7 +395,7 @@ for ax in axlist:
     ax.set_xlim(np.floor(np.nanmin(obs_temp.loc[y1base:y2base].values.squeeze()))-3,np.ceil(np.nanmax(obs_temp))+4)
     ax.set_xlabel('Temperature [°C]')
     ax.grid(True, zorder=1)
-    ax.set_ylim(0, 0.3)
+    ax.set_ylim(0, 0.5)
 ax1.set_ylabel('Relative frequency / probability density [1/°C]')
 ax1.legend(loc='upper right', frameon=False, ncol=3, bbox_to_anchor=(0.92, 1.1))
 ax2.legend(loc='upper right', frameon=False, ncol=3, bbox_to_anchor=(1, 1.1))
@@ -443,8 +442,8 @@ textstr = '\n'.join((
 
 props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 # place a text box in upper left in axes coords
-ax2.text(1.04, 0.99, textstr, transform=ax.transAxes, fontsize=13,
-          verticalalignment='top', bbox=props)
+# ax2.text(1.04, 0.99, textstr, transform=ax.transAxes, fontsize=13,
+#           verticalalignment='top', bbox=props)
 
 # ax.set_title('b) '+subroutines.get_target_text(target_mon)+' temperature distributions' , loc='left', 
 #               fontsize=14)
@@ -470,7 +469,7 @@ plt.savefig(figurePath + figureName,dpi=300,bbox_inches='tight')
 medianprops = dict(linestyle='-', linewidth=2.5, color='firebrick')
 medianprops_mm = dict(linestyle=None, linewidth=0,)
 boxprops=dict(facecolor='red', color='k')
-model_names = subroutines.get_model_names(input_path)
+model_names= list(coeffs_single.model.values)
 
 fig, axlist=plt.subplots(nrows=1, ncols=2,figsize=(10,12), dpi=300, sharey=True)
 plt.subplots_adjust(wspace=0.7)
@@ -552,3 +551,5 @@ def calculate_percentiles(f, arr, x):
 out_preind = calculate_percentiles(f_preind, f_preind_arr, x)
 out_target = calculate_percentiles(f_target, f_target_arr, x)
 out_future = calculate_percentiles(f_future, f_future_arr, x)
+
+

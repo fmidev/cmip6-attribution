@@ -9,6 +9,7 @@ Created on Tue Mar  7 13:55:35 2023
 import xarray as xr
 import numpy as np
 import pandas as pd
+import sys
 
 def get_station_metadata(fmisid):
 
@@ -53,15 +54,6 @@ def find_nearest(array, value):
     diff = np.abs(array - value)
     idx = (diff).argmin()
     return array[idx]
-
-def get_model_names(input_path):
-    
-    df = pd.read_excel(input_path + 'input_data/model_names.xlsx')
-    
-    df = df['Model']
-    df.index= df.index+1
-    
-    return df
     
 
 def get_place_text(place):
@@ -153,25 +145,11 @@ def read_obs_temp(input_path, fmisid, target_mon):
 
 def read_sim_temp_single_models(input_path, ssp, glob_obs_temp):
     
-    import sys
-    
-    if ssp=='ssp119':
-        filename = input_path + 'single_models/Tglob_'+ssp+'_14mod_1901-2100_minus_2000.nc'
-    elif ssp=='ssp126':
-        filename = input_path + 'single_models/Tglob_'+ssp+'_29mod_1901-2100_minus_2000.nc'
-    elif ssp=='ssp245':
-        filename = input_path + 'single_models/Tglob_'+ssp+'_29mod_1901-2100_minus_2000.nc'
-    elif ssp=='ssp370':
-        filename = input_path + 'single_models/Tglob_'+ssp+'_30mod_1901-2100_minus_2000.nc'
-    elif ssp=='ssp585':
-        filename = input_path + 'single_models/Tglob_'+ssp+'_30mod_1901-2100_minus_2000.nc'
-    else:
-        print('Scenario is not valid. Aborting...')
-        sys.exit() 
+    filename = input_path + 'single_models/'+ssp+'_g11_CMIP6_all_models_combined.nc'
     
     ## READ simulated temperature and smooth with 11-year rolling mean
     tglob_sim_ds = xr.open_dataset(filename)
-    tglob_sim_temp = tglob_sim_ds.dt.squeeze().rename('t')
+    tglob_sim_temp = tglob_sim_ds.tas.squeeze().rename('t')
     tglob_sim_temp['time'] = tglob_sim_ds.time.dt.year
     tglob_sim_smooth = tglob_sim_temp.rolling(time=11, center=True, min_periods=1).mean()
     
@@ -191,32 +169,18 @@ def read_sim_temp_single_models(input_path, ssp, glob_obs_temp):
 
 
     # convert to dataframe
-    glob_temp_smooth = glob_temp_smooth.astype(float).drop_vars(('lat','lon')).to_pandas()
+    glob_temp_smooth = glob_temp_smooth.astype(float).drop_vars(('latitude','longitude')).to_pandas()
     
     return glob_temp_smooth
 
 
 def read_sim_temp_model_mean(input_path, ssp, glob_obs_temp):
-    
-    import sys
-    
-    if ssp=='ssp119':
-        filename = input_path + 'model_mean/Tglob_'+ssp+'_14mod_mean_1901-2100_minus_2000.nc'
-    elif ssp=='ssp126':
-        filename = input_path + 'model_mean/Tglob_'+ssp+'_29mod_mean_1901-2100_minus_2000.nc'
-    elif ssp=='ssp245':
-        filename = input_path + 'model_mean/Tglob_'+ssp+'_29mod_mean_1901-2100_minus_2000.nc'
-    elif ssp=='ssp370':
-        filename = input_path + 'model_mean/Tglob_'+ssp+'_30mod_mean_1901-2100_minus_2000.nc'
-    elif ssp=='ssp585':
-        filename = input_path + 'model_mean/Tglob_'+ssp+'_30mod_mean_1901-2100_minus_2000.nc'
-    else:
-        print('Scenario is not valid. Aborting...')
-        sys.exit() 
+       
+    filename = input_path + 'model_mean/'+ssp+'_g11_CMIP6_modelmean.nc'
     
     ## READ simulated temperature and smooth with 11-year rolling mean
     tglob_sim_ds = xr.open_dataset(filename)
-    tglob_sim_temp = tglob_sim_ds.dt.squeeze().rename('t')
+    tglob_sim_temp = tglob_sim_ds.tas.squeeze().rename('t')
     tglob_sim_temp['time'] = tglob_sim_ds.time.dt.year
     tglob_sim_smooth = tglob_sim_temp.rolling(time=11, center=True, min_periods=1).mean()
     
@@ -236,28 +200,14 @@ def read_sim_temp_model_mean(input_path, ssp, glob_obs_temp):
 
 
     # convert to dataframe
-    glob_temp_smooth = glob_temp_smooth.astype(float).drop_vars(('lat','lon')).to_pandas()
+    glob_temp_smooth = glob_temp_smooth.astype(float).drop_vars(('latitude','longitude')).to_pandas()
     
     
     return glob_temp_smooth
 
 def read_coeffs_model_mean(input_path,ssp, target_mon, obs_lat, obs_lon):
     
-    import sys
-    
-    if ssp=='ssp119':
-        filename = input_path + 'model_mean/a_T_mean_variance_14mod_mean_'+ssp+'.nc'
-    elif ssp=='ssp126':
-        filename = input_path + 'model_mean/a_T_mean_variance_29mod_mean_'+ssp+'.nc'
-    elif ssp=='ssp245':
-        filename = input_path + 'model_mean/a_T_mean_variance_29mod_mean_'+ssp+'.nc'
-    elif ssp=='ssp370':
-        filename = input_path + 'model_mean/a_T_mean_variance_30mod_mean_'+ssp+'.nc'
-    elif ssp=='ssp585':
-        filename = input_path + 'model_mean/a_T_mean_variance_30mod_mean_'+ssp+'.nc'
-    else:
-        print('Scenario is not valid. Aborting...')
-        sys.exit() 
+    filename = input_path + 'model_mean/tas_'+ssp+'_regr_coeffs_CMIP6_modelmean.nc'
     
     coeff_ds = xr.open_dataset(filename)
     coeffs =coeff_ds.sel(lat=obs_lat, lon=obs_lon, method='nearest').isel(time=target_mon-1).squeeze()
@@ -265,28 +215,14 @@ def read_coeffs_model_mean(input_path,ssp, target_mon, obs_lat, obs_lon):
     return coeffs
 
 def read_coeffs_single_models(input_path,ssp, target_mon, obs_lat, obs_lon):
-    
-    import sys
-    
-    if ssp=='ssp119':
-        filename = input_path + 'single_models/a_T_mean_variance_14mod_'+ssp+'.nc'
-    elif ssp=='ssp126':
-        filename = input_path + 'single_models/a_T_mean_variance_29mod_'+ssp+'.nc'
-    elif ssp=='ssp245':
-        filename = input_path + 'single_models/a_T_mean_variance_29mod_'+ssp+'.nc'
-    elif ssp=='ssp370':
-        filename = input_path + 'single_models/a_T_mean_variance_30mod_'+ssp+'.nc'
-    elif ssp=='ssp585':
-        filename = input_path + 'single_models/a_T_mean_variance_30mod_'+ssp+'.nc'
-    else:
-        print('Scenario is not valid. Aborting...')
-        sys.exit() 
+       
+    filename = input_path + 'single_models/tas_'+ssp+'_regr_coeffs_CMIP6_all_models_combined.nc'
     
     coeff_ds = xr.open_dataset(filename)
     coeffs =coeff_ds.sel(lat=obs_lat, lon=obs_lon, method='nearest').isel(time=target_mon-1).squeeze()
     
 
-    return coeffs.rename({'am':'aam', 'av':'aav'})
+    return coeffs
 
 
 
@@ -303,7 +239,7 @@ def modify_obs(obs_temp, glob_temp, coeffs, y_target):
     # smoothed global mean T in target year
     gg = g.loc[y_target]
     
-    # Calculation of the intermediate values, with changes is mean only
+    # Calculation of the intermediate values, with changes in mean only
     mod3 = obs_temp + (coeffs.aam.values * (g.loc[y_target]-g.loc[obs_temp.index]))
     
     # Mean value, against which anomalies are defined
@@ -384,6 +320,8 @@ def frsgs(y, valmax, valmin, nbins,):
     b2=2*(std**2.)*(1-e2/2.-((1-e2)**2.)/(8.*e2)*(skew**2.))
     
     if b2 < 0:
+        print("asdfa")
+        sys.exit()
         f[:]=np.nan
         cum_prob[:]=np.nan    
         
@@ -425,43 +363,43 @@ def frsgs(y, valmax, valmin, nbins,):
     
     return f, cum_prob, (m1, variance, skew, kurt)
     
-def calculate_sgs_dist(obs_df, y1base, y2base, valmax, valmin, nbins, n_bts):
+# def calculate_sgs_dist(obs_df, y1base, y2base, valmax, valmin, nbins, n_bts):
     
-    import random
+#     import random
 
     
-    obs_df = pd.DataFrame(obs_df)
+#     obs_df = pd.DataFrame(obs_df)
     
-    n_mod = obs_df.shape[1]
+#     n_mod = obs_df.shape[1]
     
-    resol=(valmax-valmin)/(nbins-1)
-    index = np.arange(valmin, valmax+resol, resol).round(3)
+#     resol=(valmax-valmin)/(nbins-1)
+#     index = np.arange(valmin, valmax+resol, resol).round(3)
     
     
-    f_arr = np.zeros((len(index), n_mod, n_bts))
-    cp_arr = np.zeros((len(index), n_mod, n_bts))
+#     f_arr = np.zeros((len(index), n_mod, n_bts))
+#     cp_arr = np.zeros((len(index), n_mod, n_bts))
     
 
         
-    # loop over all models (if there are many models)
-    for m in np.arange(0,n_mod):
+#     # loop over all models (if there are many models)
+#     for m in np.arange(0,n_mod):
         
-        # if there is only one realization
-        if n_mod>1:
-            the_list = list(obs_df[m+1].loc[y1base:y2base].values.squeeze())
-        else:
-            the_list = list(obs_df.loc[y1base:y2base].values.squeeze())
+#         # if there is only one realization
+#         if n_mod>1:
+#             the_list = list(obs_df[m+1].loc[y1base:y2base].values.squeeze())
+#         else:
+#             the_list = list(obs_df.loc[y1base:y2base].values.squeeze())
         
-        # loop over all bootstrapping
-        for I in np.arange(0, n_bts):
+#         # loop over all bootstrapping
+#         for I in np.arange(0, n_bts):
             
-            # select randomly 100 temperatures
-            temp = random.choices(the_list, k=100)
+#             # select randomly 100 temperatures
+#             temp = random.choices(the_list, k=100)
         
         
-            f_arr[:,m,I], cp_arr[:,m,I] = frsgs(temp, y1base, y2base, valmax, valmin, nbins)
+#             f_arr[:,m,I], cp_arr[:,m,I] = frsgs(temp, y1base, y2base, valmax, valmin, nbins)
     
-    return np.reshape(f_arr, (nbins, n_mod*n_bts)), np.reshape(cp_arr, (nbins, n_mod*n_bts))
+#     return np.reshape(f_arr, (nbins, n_mod*n_bts)), np.reshape(cp_arr, (nbins, n_mod*n_bts))
 
 def calculate_sgs(obs_df, valmax, valmin, nbins):
 
@@ -484,7 +422,7 @@ def calculate_sgs(obs_df, valmax, valmin, nbins):
         
         # if there is only one realization
         if n_mod>1:
-            temp = list(obs_df[m+1].values.squeeze())
+            temp = list(obs_df.iloc[:,m].values.squeeze())
         else:
             temp = list(obs_df.values.squeeze())
         
