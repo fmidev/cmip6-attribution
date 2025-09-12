@@ -8,7 +8,8 @@ The method is documented in Rantanen et al. (2024): A method for estimating the 
 ## Preparing the input data
 
 1. Calculation of the covariate (11-year global mean temperature) and CMIP6-based regression coefficients
-   Run ```calculate_coeffs.py```. You need to define the scenario and the input / output paths in the script. 
+
+Run ```calculate_coeffs.py```. You need to define the scenario and the input / output paths in the script. 
 
 ## Run the main script
 
