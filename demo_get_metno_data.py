@@ -3,7 +3,7 @@ import subroutines
 
 # %%
 metnosid = "SN18700"  # Oslo-Blindern
-frost_client_id = "f2393df4-a312-4c7a-a287-cc0fd6180af1"
+frost_client_id = ""  # add your personal client id here
 
 # %%
 data = subroutines.read_monthly_temps_from_frost(metnosid, frost_client_id, homogenised=True)
