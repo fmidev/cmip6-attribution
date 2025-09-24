@@ -157,21 +157,6 @@ def find_nearest(array, value):
     return array[idx]
 
 
-# <<<<<<< Updated upstream
-# def get_place_text(place):
-
-#     place_text = {"kaisaniemi": "Helsinki Kaisaniemi", "sodankylä": "Sodankylä Tähtelä", "finland": "Finland national average"}
-#     return place_text[place]
-# =======
-# def get_place_text(place):
-    
-#     place_text = {'kaisaniemi':'Helsinki Kaisaniemi',
-#                   'sodankylä':'Sodankylä Tähtelä',
-#                   'finland':'Finland national average'}
-#     return place_text[place]
-# >>>>>>> Stashed changes
-
-
 def get_scenario_text(ssp):
 
     ssp_text = {
@@ -320,16 +305,6 @@ def read_sim_temp_single_models(input_path, ssp, glob_obs_temp):
 
     return glob_temp_smooth
 
-# <<<<<<< Updated upstream
-# =======
-# def read_coeffs_model_mean(input_path,ssp, target_mon, obs_lat, obs_lon):
-    
-#     filename = input_path + 'model_mean/tas_'+ssp+'_regr_coeffs_CMIP6_modelmean.nc'
-    
-#     coeff_ds = xr.open_dataset(filename).load()
-#     coeffs =coeff_ds.sel(lat=obs_lat, lon=obs_lon, method='nearest').isel(time=target_mon-1).squeeze()
-# >>>>>>> Stashed changes
-
 def read_sim_temp_model_mean(input_path, ssp, glob_obs_temp):
 
     filename = input_path + "model_mean/" + ssp + "_g11_CMIP6_modelmean.nc"
@@ -376,17 +351,6 @@ def read_coeffs_single_models(input_path,ssp, target_mon, obs_lat, obs_lon):
     coeffs =coeff_ds.sel(lat=obs_lat, lon=obs_lon, method='nearest').isel(time=target_mon-1).squeeze()
 
     return coeffs
-
-
-def read_coeffs_single_models(input_path, ssp, target_mon, obs_lat, obs_lon):
-
-    filename = input_path + "single_models/tas_" + ssp + "_regr_coeffs_CMIP6_all_models_combined.nc"
-
-    coeff_ds = xr.open_dataset(filename)
-    coeffs = coeff_ds.sel(lat=obs_lat, lon=obs_lon, method="nearest").isel(time=target_mon - 1).squeeze()
-
-    return coeffs
-
 
 def modify_obs(obs_temp, glob_temp, coeffs, y_target):
 
@@ -517,44 +481,6 @@ def frsgs(
         cum_prob[ind] = cum_prob[ind] / cum_prob[nbins - 1]
 
     return f, cum_prob, (m1, variance, skew, kurt)
-
-
-# def calculate_sgs_dist(obs_df, y1base, y2base, valmax, valmin, nbins, n_bts):
-
-#     import random
-
-
-#     obs_df = pd.DataFrame(obs_df)
-
-#     n_mod = obs_df.shape[1]
-
-#     resol=(valmax-valmin)/(nbins-1)
-#     index = np.arange(valmin, valmax+resol, resol).round(3)
-
-
-#     f_arr = np.zeros((len(index), n_mod, n_bts))
-#     cp_arr = np.zeros((len(index), n_mod, n_bts))
-
-
-#     # loop over all models (if there are many models)
-#     for m in np.arange(0,n_mod):
-
-#         # if there is only one realization
-#         if n_mod>1:
-#             the_list = list(obs_df[m+1].loc[y1base:y2base].values.squeeze())
-#         else:
-#             the_list = list(obs_df.loc[y1base:y2base].values.squeeze())
-
-#         # loop over all bootstrapping
-#         for I in np.arange(0, n_bts):
-
-#             # select randomly 100 temperatures
-#             temp = random.choices(the_list, k=100)
-
-
-#             f_arr[:,m,I], cp_arr[:,m,I] = frsgs(temp, y1base, y2base, valmax, valmin, nbins)
-
-#     return np.reshape(f_arr, (nbins, n_mod*n_bts)), np.reshape(cp_arr, (nbins, n_mod*n_bts))
 
 
 def calculate_sgs(obs_df, valmax, valmin, nbins):
