@@ -39,13 +39,13 @@ First, give the input parameters: place, month, year, and scenario
 # Helsinki Kaisaniemi: 100971
 # Sodankylä Tähtelä: 101932
 # Parainen Utö: 100908
-fmisid=100971
+fmisid=101932
 
 # Target Month (1-12) / Season (13-16) / Annual mean (17)? (e.g., 12)
-target_mon = 1
+target_mon = 9
 
 # Target year
-y_target = 2024
+y_target = 2025
 
 # Future climate year
 y_climate = 2050
@@ -76,7 +76,7 @@ nbins=1601
 
 x = np.linspace(valmin, valmax,nbins)
 # Number of bootstrapping in the uncertainty estimate
-n_bts = 1000
+n_bts = 10
 # input path for the datafiles
 input_path = '/Users/rantanem/Documents/python/cmip6-attribution/'
 # lat/lon coordinates + station name
@@ -110,11 +110,12 @@ for the Tglob-regressed changes in mean and variability
 """
 #### A) Observed local temperatures  
 obs_temp = subroutines.read_obs_temp(input_path, fmisid, target_mon).loc[1901:]
-
+obs_temp[2025] = 10.9
 
 ### B) The coefficients for the Tglob-regressed changes in mean and variability
 coeffs_single = subroutines.read_coeffs_single_models(input_path,ssp, target_mon, latlon[0], latlon[1])
 coeffs_mean = subroutines.read_coeffs_model_mean(input_path,ssp, target_mon, latlon[0], latlon[1])
+coeffs_obs = subroutines.get_obs_coeffs(target_mon, latlon[0], latlon[1])
 """
 ################################################################
 Everything has been read in. Next, recalculate the observed time series    
@@ -138,6 +139,11 @@ pseudo_obs_preind_year_model_mean = subroutines.modify_obs(obs_temp, glob_temp_m
 pseudo_obs_target_year_model_mean = subroutines.modify_obs(obs_temp, glob_temp_mean, coeffs_mean, y_target)
 pseudo_obs_future_year_model_mean = subroutines.modify_obs(obs_temp, glob_temp_mean, coeffs_mean, y_climate)
 
+# Calculate obs-based pseudo-obs
+pseudo_obs_preind_year_obs = subroutines.modify_obs(obs_temp, glob_temp_mean, coeffs_obs, y_preind)
+pseudo_obs_target_year_obs = subroutines.modify_obs(obs_temp, glob_temp_mean, coeffs_obs, y_target)
+pseudo_obs_future_year_obs = subroutines.modify_obs(obs_temp, glob_temp_mean, coeffs_obs, y_climate)
+
 
 """
 ################################################################
@@ -156,8 +162,13 @@ f_obs, cp_obs,_ = subroutines.calculate_sgs(obs_temp.loc[y1base:y2base], valmax,
 # SGS distributions for pseudo observations (pre-industrial, target and future climates)
 # based on multi-model mean coefficients
 f_preind, cp_preind,_ = subroutines.calculate_sgs(pseudo_obs_preind_year_model_mean.loc[y1base:y2base], valmax, valmin, nbins)
-f_target, cp_target,moments = subroutines.calculate_sgs(pseudo_obs_target_year_model_mean.loc[y1base:y2base], valmax, valmin, nbins)
+f_target, cp_target, moments = subroutines.calculate_sgs(pseudo_obs_target_year_model_mean.loc[y1base:y2base], valmax, valmin, nbins)
 f_future, cp_future,_ = subroutines.calculate_sgs(pseudo_obs_future_year_model_mean.loc[y1base:y2base], valmax, valmin, nbins)
+
+# SGS distributions based on observational coefficients
+f_preind_obs, cp_preind_obs,_ = subroutines.calculate_sgs(pseudo_obs_preind_year_obs.loc[y1base:y2base], valmax, valmin, nbins)
+f_target_obs, cp_target_obs,moments_obs = subroutines.calculate_sgs(pseudo_obs_target_year_obs.loc[y1base:y2base], valmax, valmin, nbins)
+f_future_obs, cp_future_obs,_ = subroutines.calculate_sgs(pseudo_obs_future_year_obs.loc[y1base:y2base], valmax, valmin, nbins)
 
 
 """
@@ -178,6 +189,13 @@ cp_target_3d_arr = np.empty((nbins,n_mod,n_bts+1))
 f_target_3d_arr = np.empty((nbins,n_mod,n_bts+1))
 cp_future_3d_arr = np.empty((nbins,n_mod,n_bts+1))
 f_future_3d_arr = np.empty((nbins,n_mod,n_bts+1))
+
+cp_preind_obs_based_arr = np.empty((nbins,n_bts+1))
+f_preind_obs_based_arr = np.empty((nbins,n_bts+1))
+cp_target_obs_based_arr = np.empty((nbins,n_bts+1))
+f_target_obs_based_arr = np.empty((nbins,n_bts+1))
+cp_future_obs_based_arr = np.empty((nbins,n_bts+1))
+f_future_obs_based_arr = np.empty((nbins,n_bts+1))
 
 # The years which are resampled in the bootsrapping
 the_list = obs_temp.loc[y1base:y2base].index
@@ -203,6 +221,12 @@ for b in np.arange(0, n_bts+1):
     f_target_3d_arr[:,:,b], cp_target_3d_arr[:,:,b],_ = subroutines.calculate_sgs(pseudo_obs_target_year_single_models.loc[res], valmax, valmin, nbins)
 
     f_future_3d_arr[:,:,b], cp_future_3d_arr[:,:,b],_ = subroutines.calculate_sgs(pseudo_obs_future_year_single_models.loc[res], valmax, valmin, nbins)
+
+    # Calculate bootstrapping for obs-based attribution
+    f_preind_obs_based_arr[:, b], cp_preind_obs_based_arr[:, b],_ = subroutines.calculate_sgs(pseudo_obs_preind_year_obs.loc[res], valmax, valmin, nbins)
+    f_target_obs_based_arr[:, b], cp_target_obs_based_arr[:, b],_ = subroutines.calculate_sgs(pseudo_obs_target_year_obs.loc[res], valmax, valmin, nbins)
+    f_future_obs_based_arr[:, b], cp_future_obs_based_arr[:, b],_ = subroutines.calculate_sgs(pseudo_obs_future_year_obs.loc[res], valmax, valmin, nbins)
+
 
 
 # Reshape 3D arrays into 2D arrays 
@@ -243,6 +267,12 @@ if pwarm:
     pr_ratio = prob_in_target / prob_in_preind
     pr_ratio_low = np.nanpercentile((1-cp_target_arr[i,:]) / (1-cp_preind_arr[i,:]), 5)
     pr_ratio_up = np.nanpercentile((1-cp_target_arr[i,:]) / (1-cp_preind_arr[i,:]), 95)
+    
+    prob_in_target_obs_based = 1- cp_target_obs[i]
+    prob_in_preind_obs_based = 1- cp_preind_obs[i]
+    pr_ratio_obs = prob_in_target_obs_based / prob_in_preind_obs_based
+    pr_ratio_obs_low = np.nanpercentile((1-cp_target_obs_based_arr[i,:]) / (1-cp_preind_obs_based_arr[i,:]), 5)
+    pr_ratio_obs_up = np.nanpercentile((1-cp_target_obs_based_arr[i,:]) / (1-cp_preind_obs_based_arr[i,:]), 95)
 
 else:
     prob_in_obs = cp_obs[i]
@@ -261,15 +291,25 @@ else:
     pr_ratio = prob_in_preind / prob_in_target
     pr_ratio_low = np.nanpercentile((cp_preind_arr[i,:]) / (cp_target_arr[i,:]), 5)
     pr_ratio_up = np.nanpercentile((cp_preind_arr[i,:]) / (cp_target_arr[i,:]), 95)
+    
+    prob_in_target_obs_based = cp_target_obs[i]
+    prob_in_preind_obs_based = cp_preind_obs[i]
+    pr_ratio_obs = prob_in_target_obs_based / prob_in_preind_obs_based
+    pr_ratio_obs_low = np.nanpercentile((cp_target_obs_based_arr[i,:]) / (cp_preind_obs_based_arr[i,:]), 5)
+    pr_ratio_obs_up = np.nanpercentile((cp_target_obs_based_arr[i,:]) / (cp_preind_obs_based_arr[i,:]), 95)
 
 
 # Percentile in today's climate
 prob = cp_target[i]
+prob_obs = cp_target_obs[i]
 
 # Calculate corresponding temperatures in other climates
 t_1901 = np.round(np.squeeze(x[np.where(cp_obs == subroutines.find_nearest(cp_obs,prob))[0]]),1)
 t_1900 = np.round(np.squeeze(x[np.where(cp_preind == subroutines.find_nearest(cp_preind,prob))[0]]),1)
 t_2050 = np.round(np.squeeze(x[np.where(cp_future == subroutines.find_nearest(cp_future,prob))[0]]),1)
+
+t_1900_obs = np.round(np.squeeze(x[np.where(cp_preind_obs == subroutines.find_nearest(cp_preind_obs,prob_obs))[0]]),1)
+t_2050_obs = np.round(np.squeeze(x[np.where(cp_future_obs == subroutines.find_nearest(cp_future_obs,prob_obs))[0]]),1)
 
 t1900_lower, t1900_upper,_ = subroutines.find_intensity_interval(x, cp_target_arr, cp_preind_arr, i)
 t2050_lower, t2050_upper,_ = subroutines.find_intensity_interval(x, cp_target_arr, cp_future_arr, i)
@@ -489,15 +529,32 @@ a = ax.boxplot(filtered_data,positions=np.arange(0,n_mod), labels=model_names, v
 
 a2 = ax.boxplot(np.concatenate(filtered_data), positions=[n_mod],labels=['MMM'], vert=False, showfliers=False,  
                 patch_artist=True,medianprops=medianprops_mm,whis=(5,95), widths=0.7, boxprops=boxprops)
+
+
 a2b = ax.boxplot(pr_ratio_bp, positions=[n_mod], labels=[''],vert=False, showfliers=False,
                 medianprops=medianprops,whis=(5,95), widths=0.7)
+a2 = ax.boxplot(np.concatenate(filtered_data), positions=[n_mod],labels=['MMM'], vert=False, showfliers=False,  
+                patch_artist=True,medianprops=medianprops_mm,whis=(5,95), widths=0.7, boxprops=boxprops)
+
+
+
+pr_ratio_obs_bp = np.array(pr_ratio_obs)
+pr_ratio_obs_bp = pr_ratio_obs_bp.reshape(pr_ratio_obs_bp.shape + (1,))
+obs_sample = (1-cp_target_obs_based_arr[i,:]) / (1-cp_preind_obs_based_arr[i,:])
+
+# ob = ax.boxplot(pr_ratio_obs_bp, positions=[n_mod+1], labels=[''],vert=False, showfliers=False,
+#                 medianprops=medianprops,whis=(5,95), widths=0.7)
+
+ob2 = ax.boxplot(obs_sample, positions=[n_mod+1],labels=['HadCRUT5'], vert=False, showfliers=False,  
+                patch_artist=True,medianprops=medianprops_mm,whis=(5,95), widths=0.7, boxprops=boxprops)
+
 
 ax.yaxis.tick_right()
-ax.set_xlim(1, 10000)
+ax.set_xlim(1, 1000)
 
 ax.set_xlabel('Probability ratio')
 ax.set_xscale('log')
-ax.set_xticks(ticks=[1,10,100,1000,10000,100000])
+ax.set_xticks(ticks=[1,10,100,1000, 10000])
 ax.invert_yaxis()
 
 
@@ -516,7 +573,12 @@ b2 = ax.boxplot(deltaI_mm,positions=[n_mod], labels=[''], vert=False, showfliers
 b3 = ax.boxplot(np.concatenate(deltaI), positions=[n_mod],labels=['MMM'], vert=False, showfliers=False,  
                 patch_artist=True,medianprops=medianprops_mm,whis=(5,95), widths=0.7, boxprops=boxprops)
 
-ax.set_xlim(0, 4)
+deltaI_obs = np.round(target_value - t_1900_obs,1)
+deltaI_obs = deltaI_obs.reshape(deltaI_mm.shape + (1,))
+b2_obs = ax.boxplot(deltaI_obs, positions=[n_mod+1], labels=[''], vert=False, showfliers=False, medianprops=medianprops,
+                    widths=0.7)
+
+ax.set_xlim(0, 5)
 ax.set_xlabel('Change in intensity [°C]')
 
 figurePath = '/Users/rantanem/Documents/python/cmip6-attribution/figures/'

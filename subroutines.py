@@ -157,10 +157,19 @@ def find_nearest(array, value):
     return array[idx]
 
 
-def get_place_text(place):
+# <<<<<<< Updated upstream
+# def get_place_text(place):
 
-    place_text = {"kaisaniemi": "Helsinki Kaisaniemi", "sodankylä": "Sodankylä Tähtelä", "finland": "Finland national average"}
-    return place_text[place]
+#     place_text = {"kaisaniemi": "Helsinki Kaisaniemi", "sodankylä": "Sodankylä Tähtelä", "finland": "Finland national average"}
+#     return place_text[place]
+# =======
+# def get_place_text(place):
+    
+#     place_text = {'kaisaniemi':'Helsinki Kaisaniemi',
+#                   'sodankylä':'Sodankylä Tähtelä',
+#                   'finland':'Finland national average'}
+#     return place_text[place]
+# >>>>>>> Stashed changes
 
 
 def get_scenario_text(ssp):
@@ -311,6 +320,15 @@ def read_sim_temp_single_models(input_path, ssp, glob_obs_temp):
 
     return glob_temp_smooth
 
+# <<<<<<< Updated upstream
+# =======
+# def read_coeffs_model_mean(input_path,ssp, target_mon, obs_lat, obs_lon):
+    
+#     filename = input_path + 'model_mean/tas_'+ssp+'_regr_coeffs_CMIP6_modelmean.nc'
+    
+#     coeff_ds = xr.open_dataset(filename).load()
+#     coeffs =coeff_ds.sel(lat=obs_lat, lon=obs_lon, method='nearest').isel(time=target_mon-1).squeeze()
+# >>>>>>> Stashed changes
 
 def read_sim_temp_model_mean(input_path, ssp, glob_obs_temp):
 
@@ -346,6 +364,16 @@ def read_coeffs_model_mean(input_path, ssp, target_mon, obs_lat, obs_lon):
 
     coeff_ds = xr.open_dataset(filename)
     coeffs = coeff_ds.sel(lat=obs_lat, lon=obs_lon, method="nearest").isel(time=target_mon - 1).squeeze()
+    
+    return coeffs
+    
+
+def read_coeffs_single_models(input_path,ssp, target_mon, obs_lat, obs_lon):
+       
+    filename = input_path + 'single_models/tas_'+ssp+'_regr_coeffs_CMIP6_all_models_combined.nc'
+    
+    coeff_ds = xr.open_dataset(filename).load()
+    coeffs =coeff_ds.sel(lat=obs_lat, lon=obs_lon, method='nearest').isel(time=target_mon-1).squeeze()
 
     return coeffs
 
@@ -588,4 +616,122 @@ def find_difference_interval(x, cp_target_arr, cp_preind_arr, i):
             cp_df[m] = t2 - t4
 
     return (np.percentile(cp_df, 5), np.percentile(cp_df, 95), cp_df)
-    return (np.percentile(cp_df, 5), np.percentile(cp_df, 95), cp_df)
+
+
+def obs_regression(target_mon):
+    
+    from scipy.stats import linregress
+    
+    # Start year of the linear regression
+    start_year = 1900
+    # End year of the linear regression
+    end_year = 2020
+    
+    years = np.arange(int(start_year), int(end_year) + 1)
+    # index of year 2000
+    year_2000_idx = np.where(years == 2000)[0][0]
+    
+    # Read HadCRUT5 data
+    ds = xr.open_dataset("/Users/rantanem/Downloads/HadCRUT.5.0.2.0.analysis.anomalies.ensemble_mean.nc")
+    da = ds["tas_mean"].squeeze()
+    
+    # Calculate annual mean temperature
+    annual = da.resample(time="1YE").mean()
+    
+    # Calculate weighted global mean average
+    weights = np.cos(np.deg2rad(da.latitude))
+    global_mean = annual.weighted(weights).mean(dim=("latitude", "longitude"))
+    
+    # smooth with 11-year average
+    ds_g11 = global_mean.rolling(time=11, center=True, min_periods=1).mean()
+    
+    # Extract data for the specific month, season or annual
+    if target_mon <=12:
+        monthly_data = da.sel(time=da.time.dt.month == target_mon)
+    elif target_mon==13: #DJF
+        d = da.resample(time='QS-DEC').mean(dim="time")
+        monthly_data = d.sel(time=d.time.dt.month == 12)
+        # add one year to select the year of Jan-Feb
+        monthly_data['time'] = monthly_data.indexes['time'] + pd.DateOffset(years=1)
+    elif target_mon==14: #MAM
+        d = da.resample(time='QS-DEC').mean(dim="time")
+        monthly_data = d.sel(time=d.time.dt.month == 3)
+    elif target_mon==15: #JJA
+        d = da.resample(time='QS-DEC').mean(dim="time")
+        monthly_data = d.sel(time=d.time.dt.month == 6)
+    elif target_mon==16: #SON
+        d = da.resample(time='QS-DEC').mean(dim="time")
+        monthly_data = d.sel(time=d.dt.month == 9)
+    elif target_mon==17: #ANNUAL
+        monthly_data = da.resample(time='AS').mean(dim="time")
+    
+    # select data accordingly
+    monthly_data = monthly_data.sel(time=slice(f"{start_year}-01-01", f"{end_year}-12-31"))
+    ds_g11 = ds_g11.sel(time=slice(f"{start_year}-01-01", f"{end_year}-12-31"))
+    
+    # 11-year global mean time series
+    g11 = ds_g11.values.squeeze()
+    
+    # Convert Kelvin to Celsius
+    monthly_array = monthly_data.values
+
+     # Initialize arrays for regression coefficients
+    shape = monthly_array.shape[1:] # Get the shape for latitude/longitude
+    A, B, C, D = np.empty(shape), np.empty(shape), np.empty(shape), np.empty(shape)
+
+    for lat in range(shape[0]):
+        for lon in range(shape[1]):
+            slope, intercept, _, _, _ = linregress(g11, monthly_array[:, lat, lon])
+            A[lat, lon] = intercept
+            B[lat, lon] = slope
+
+            regressed = intercept + slope * g11[:, None]
+            residuals = monthly_array[:, lat, lon] - regressed.squeeze()
+            tas_var = residuals ** 2
+
+            slope_var, intercept_var, _, _, _ = linregress(g11, tas_var)
+            C[lat, lon] = intercept_var
+            D[lat, lon] = slope_var
+
+    var_regression_fit = C + D * g11[:, None, None]
+    var2000 = var_regression_fit[year_2000_idx, :, :]
+    D_final = D / np.squeeze(var2000)
+    
+    # Convert A_dict and B_dict to xarray.DataArray objects
+    B_da = xr.DataArray(
+        data=B,
+        dims=["lat", "lon"],
+        coords={
+            "lat": da.latitude.values,
+            "lon": da.longitude.values
+        },
+    )
+    
+    # Convert A_dict and B_dict to xarray.DataArray objects
+    D_da = xr.DataArray(
+        data=D_final,
+        dims=["lat", "lon"],
+        coords={
+            "lat": da.latitude.values,
+            "lon": da.longitude.values
+        },
+    )
+    
+    return B_da, D_da
+
+
+def get_obs_coeffs(target_mon, obs_lat, obs_lon):
+    
+    B_da, D_da = obs_regression(target_mon)
+    
+    # Create an xarray.Dataset to hold both A and B arrays
+    ds_coeffs = xr.Dataset(
+        {
+            "aam": B_da,
+            "aav": D_da,
+        }
+    )
+    
+    obs_coeffs = ds_coeffs.sel(lat=obs_lat, lon=obs_lon, method='nearest')
+    
+    return obs_coeffs
