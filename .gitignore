@@ -4,3 +4,4 @@ results
 my_scripts
 __pycache__
 dev_*.py
+input_data/.DS_Store
