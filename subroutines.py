@@ -192,14 +192,35 @@ def get_target_text(target_mon):
     }
     return target_text[target_mon]
 
+def read_global_temperature(input_path):
+
+    ## READ observed global temperature
+    glob_obs_ds = xr.open_dataset(input_path + 'input_data/HadCRUT.5.0.2.0.analysis.summary_series.global.annual.nc')
+    glob_obs_temp = glob_obs_ds['tas_mean'].squeeze().sel(time=slice('1850-01-01','2024-12-31'))
+    glob_obs_temp['time'] = glob_obs_temp.time.dt.year
+
+    return glob_obs_temp
+
+def read_smoothed_global_temperature(input_path, obs):
+
+    ## READ observed global temperature
+    glob_obs_ds = xr.open_dataarray(input_path + 'input_data/g11_'+obs+'.nc')
+    glob_obs_temp = glob_obs_ds.squeeze()
+    glob_obs_temp['time'] = glob_obs_temp.time.dt.year
+    glob_obs_temp = glob_obs_temp.to_pandas()
+
+    glob_obs_temp = glob_obs_temp - glob_obs_temp.loc[2000].mean() 
+
+    return glob_obs_temp
+
 
 def read_obs_temp(input_path, fmisid, target_mon):
 
     # read raw observations from Smartmet
     all_obs_months = read_monthly_temps_from_smartmet(fmisid)
 
-    # If Hel Kaisaniemi, use adjusted observations for the 20th century
-    # and concat with raw observations
+    # For Helsinki Kaisaniemi, use homogenized observations for the 20th century
+    # and concat with raw observations for 2000 onwards
     if fmisid == 100971:
         print("Downloading adjusted observations...")
         filename = input_path + "input_data/HKI_T_R_ori-adj.xls"
@@ -381,12 +402,7 @@ def modify_obs(obs_temp, glob_temp, coeffs, y_target):
     return fmod.loc[obs_temp.index]
 
 
-def frsgs(
-    y,
-    valmax,
-    valmin,
-    nbins,
-):
+def frsgs(y,valmax,valmin,nbins):
 
     # This function converts a sample of (original or modified) observations (y)
     # to a continuous SGS probability distribution (f). The corresponding
@@ -544,7 +560,7 @@ def find_difference_interval(x, cp_target_arr, cp_preind_arr, i):
     return (np.percentile(cp_df, 5), np.percentile(cp_df, 95), cp_df)
 
 
-def obs_regression(target_mon):
+def obs_regression(input_path, target_mon):
     
     from scipy.stats import linregress
     
@@ -558,7 +574,7 @@ def obs_regression(target_mon):
     year_2000_idx = np.where(years == 2000)[0][0]
     
     # Read HadCRUT5 data
-    ds = xr.open_dataset("/Users/rantanem/Downloads/HadCRUT.5.0.2.0.analysis.anomalies.ensemble_mean.nc")
+    ds = xr.open_dataset(input_path +  "/input_data/HadCRUT.5.0.2.0.analysis.anomalies.ensemble_mean.nc")
     da = ds["tas_mean"].squeeze()
     
     # Calculate annual mean temperature
@@ -646,18 +662,15 @@ def obs_regression(target_mon):
     return B_da, D_da
 
 
-def get_obs_coeffs(target_mon, obs_lat, obs_lon):
+def get_obs_coeffs(obs_datasets, input_path, target_mon, obs_lat, obs_lon):
+
+    obs_coeffs = pd.DataFrame(columns=obs_datasets, index=['aam','aav'])
     
-    B_da, D_da = obs_regression(target_mon)
-    
-    # Create an xarray.Dataset to hold both A and B arrays
-    ds_coeffs = xr.Dataset(
-        {
-            "aam": B_da,
-            "aav": D_da,
-        }
-    )
-    
-    obs_coeffs = ds_coeffs.sel(lat=obs_lat, lon=obs_lon, method='nearest')
+    for obs in obs_datasets:
+        ds = xr.open_dataset(input_path + "input_data/obs_regr_coeffs_"+obs+".nc")
+        ds = ds.isel(time=target_mon-1)
+        ds = ds.sel(lat=obs_lat, lon=obs_lon, method='nearest').to_pandas()
+
+        obs_coeffs[obs] = ds
     
     return obs_coeffs
