@@ -42,10 +42,10 @@ First, give the input parameters: place, month, year, and scenario
 fmisid=101932
 
 # Target Month (1-12) / Season (13-16) / Annual mean (17)? (e.g., 12)
-target_mon = 9
+target_mon = 14
 
 # Target year
-y_target = 2025
+y_target = 2026
 
 # Future climate year
 y_climate = 2050
@@ -56,6 +56,11 @@ y_preind = 1900
 # probability of warmer temperatures (colder if false)
 pwarm = True
 
+# Weight given to observational estimate of the mean-temperature coefficient
+# 0 = CMIP6 only
+# 1 = observations only
+alpha = 1.0
+
 # Scenario for future climate (ssp119, ssp126, ssp245, ssp370, ssp585)
 ssp = 'ssp245'
 
@@ -65,6 +70,9 @@ ssp = 'ssp245'
 Next, specify some additional parameters used in the calculation
 ################################################################
 """
+# List of obs datasets
+obs_datasets = ["HadCRUT5","GISTEMP","BEST"]
+n_obs = len(obs_datasets)
 
 # first and last years of observations used in calculation of probability distributions
 y1base=1901
@@ -111,7 +119,24 @@ obs_temp = subroutines.read_obs_temp(input_path, fmisid, target_mon).loc[y1base:
 
 ### B) The coefficients for the Tglob-regressed changes in mean and variability
 coeffs_single = subroutines.read_coeffs_single_models(input_path,ssp, target_mon, latlon[0], latlon[1])
-coeffs_mean = subroutines.read_coeffs_model_mean(input_path,ssp, target_mon, latlon[0], latlon[1])
+coeffs_cmip6_mean = subroutines.read_coeffs_model_mean(input_path,ssp, target_mon, latlon[0], latlon[1])
+
+### C) The observational coefficients for the Tglob-regressed changes in mean
+coeffs_obs = subroutines.get_obs_coeffs(obs_datasets, input_path, target_mon, latlon[0], latlon[1])
+aam_obs = coeffs_obs.loc["aam"].mean()
+
+
+### D) Apply observational weighting to aam
+# CMIP6 multi-model mean coefficients
+coeffs_weighted = coeffs_cmip6_mean.copy()
+coeffs_weighted["aam"] = ((1 - alpha) * coeffs_cmip6_mean["aam"] + alpha * aam_obs)
+
+# Individual CMIP6 model coefficients
+coeffs_single_weighted = coeffs_single.copy()
+coeffs_single_weighted["aam"] = ((1 - alpha) * coeffs_single["aam"] + alpha * aam_obs)
+
+# The aav coefficient remains unchanged and CMIP6-based
+
 """
 ################################################################
 Everything has been read in. Next, recalculate the observed time series    
@@ -126,14 +151,14 @@ pseudo_obs_future_year_single_models = pd.DataFrame(index=obs_temp.index, column
 
 for m in glob_temp_single.columns:
     
-    pseudo_obs_preind_year_single_models[m] = subroutines.modify_obs(obs_temp, glob_temp_single[m], coeffs_single.sel(model=m), y_preind)
-    pseudo_obs_target_year_single_models[m] = subroutines.modify_obs(obs_temp, glob_temp_single[m], coeffs_single.sel(model=m), y_target)
-    pseudo_obs_future_year_single_models[m] = subroutines.modify_obs(obs_temp, glob_temp_single[m], coeffs_single.sel(model=m), y_climate)
+    pseudo_obs_preind_year_single_models[m] = subroutines.modify_obs(obs_temp, glob_temp_single[m], coeffs_single_weighted.sel(model=m), y_preind)
+    pseudo_obs_target_year_single_models[m] = subroutines.modify_obs(obs_temp, glob_temp_single[m], coeffs_single_weighted.sel(model=m), y_target)
+    pseudo_obs_future_year_single_models[m] = subroutines.modify_obs(obs_temp, glob_temp_single[m], coeffs_single_weighted.sel(model=m), y_climate)
     
 # Calculate multi-model-mean
-pseudo_obs_preind_year_model_mean = subroutines.modify_obs(obs_temp, glob_temp_mean, coeffs_mean, y_preind)
-pseudo_obs_target_year_model_mean = subroutines.modify_obs(obs_temp, glob_temp_mean, coeffs_mean, y_target)
-pseudo_obs_future_year_model_mean = subroutines.modify_obs(obs_temp, glob_temp_mean, coeffs_mean, y_climate)
+pseudo_obs_preind_year_model_mean = subroutines.modify_obs(obs_temp, glob_temp_mean, coeffs_weighted, y_preind)
+pseudo_obs_target_year_model_mean = subroutines.modify_obs(obs_temp, glob_temp_mean, coeffs_weighted, y_target)
+pseudo_obs_future_year_model_mean = subroutines.modify_obs(obs_temp, glob_temp_mean, coeffs_weighted, y_climate)
 
 
 """
