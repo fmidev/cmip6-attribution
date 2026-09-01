@@ -195,9 +195,10 @@ def get_regression_coefficients(ds_var, ds_g11, day_str, clim_var):
 
     var_regression_fit = C + D * g11[:, None, None]
     var2000 = var_regression_fit[year_2000_idx, :, :]
-    D_final = D / np.squeeze(var2000)
+    D_final = np.divide(D,np.squeeze(var2000),out=np.full_like(D, np.nan),
+                        where=np.squeeze(var2000) != 0)
     
-    
+
     lat_idx = abs(monthly_data["latitude"]-67.4).argmin().item()
     lon_idx = abs(monthly_data["longitude"]-26.6).argmin().item()
     
@@ -295,22 +296,22 @@ def save_coeffs_to_netcdf(output_directory, lat, lon, B_dict, D_dict, clim_var, 
 
 ################################################################ Read model specific data #####################################################################################
 
-source = "BEST"
+source = "NOAA"
 # Climate variable (tas)
 variables = {
     "HadCRUT5":"tas_mean",
     "GISTEMP":"tempanomaly",
     "BEST":"temperature",
-    "ERA5":"t2m"
+    "NOAA":"anom"
     }
 
 clim_var=variables[source]
 
 # Paths to directories
 # path where HadCRUT5 monthly mean temperatures are stored
-path2tas_data = "/Users/rantanem/Documents/python/cmip6-attribution/input_data/"
+path2tas_data = "/Users/rantanem/Documents/python/cmip6-attribution/observations/"
 # path to the regression coefficents files
-path2results =  "/Users/rantanem/Documents/python/cmip6-attribution/input_data/"
+path2results =  "/Users/rantanem/Documents/python/cmip6-attribution/observations/"
 
 
 # open dataset
@@ -318,9 +319,9 @@ files = {
     "HadCRUT5":"HadCRUT.5.1.0.0.analysis.anomalies.ensemble_mean.nc",
     "GISTEMP":"gistemp1200_GHCNv4_ERSSTv5.nc",
     "BEST":"Global_TAVG_Gridded_1deg.nc",
-    "ERA5":"era5_t2m_1940-2025.nc"}
+    "NOAA":"NOAAGlobalTemp_v6.1.0_gridded_s185001_e202607_c20260807T143156.nc"}
 
-ds_tas = xr.open_dataset(path2tas_data + files[source])
+ds_tas = xr.open_dataset(path2tas_data + files[source]).squeeze()
 
 # rename coordinates consistently
 ds_tas = rename_lat_lon(ds_tas)
