@@ -59,11 +59,10 @@ pwarm = True
 # Weight given to observational estimate of the mean-temperature coefficient
 # 0 = CMIP6 only
 # 1 = observations only
-alpha = 1.0
+alpha = 0.5
 
 # Scenario for future climate (ssp119, ssp126, ssp245, ssp370, ssp585)
 ssp = 'ssp245'
-
 
 """
 ################################################################
@@ -71,7 +70,7 @@ Next, specify some additional parameters used in the calculation
 ################################################################
 """
 # List of obs datasets
-obs_datasets = ["HadCRUT5","GISTEMP","BEST"]
+obs_datasets = ["HadCRUT5","GISTEMP","BEST","NOAA"]
 n_obs = len(obs_datasets)
 
 # first and last years of observations used in calculation of probability distributions
