@@ -32,7 +32,7 @@ def get_station_metadata(fmisid):
     except:
         print("FAILED")
 
-    return df["latitude"][0], df["longitude"][0], df["stationname"][0]
+    return df["latitude"].iloc[0], df["longitude"].iloc[0], df["stationname"].iloc[0]
 
 
 def get_station_metadata_frost(metnosid: str, frost_client_id: str):
@@ -194,10 +194,27 @@ def get_target_text(target_mon):
 
 def read_global_temperature(input_path):
 
+    import datetime
+
+    # Read observed global temperature
+    glob_obs_ds = xr.open_dataset(input_path + 'input_data/HadCRUT.5.1.0.0.analysis.summary_series.global.annual.nc')
+    current_year = datetime.datetime.now().year
+    # Keep only completed years
+    glob_obs_temp = (glob_obs_ds['tas_mean'].squeeze().sel(time=slice('1850-01-01', f'{current_year - 1}-12-31')))
+    # Replace datetime coordinate with year
+    glob_obs_temp = glob_obs_temp.assign_coords(time=glob_obs_temp.time.dt.year)
+
+    return glob_obs_temp
+
+
+def read_smoothed_global_temperature(input_path, obs):
     ## READ observed global temperature
-    glob_obs_ds = xr.open_dataset(input_path + 'input_data/HadCRUT.5.0.2.0.analysis.summary_series.global.annual.nc')
-    glob_obs_temp = glob_obs_ds['tas_mean'].squeeze().sel(time=slice('1850-01-01','2024-12-31'))
+    glob_obs_ds = xr.open_dataarray(input_path + 'input_data/g11_'+obs+'.nc')
+    glob_obs_temp = glob_obs_ds.squeeze()
     glob_obs_temp['time'] = glob_obs_temp.time.dt.year
+    glob_obs_temp = glob_obs_temp.to_pandas()
+
+    glob_obs_temp = glob_obs_temp - glob_obs_temp.loc[2000].mean()
 
     return glob_obs_temp
 
