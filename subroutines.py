@@ -568,7 +568,7 @@ def get_obs_coeffs(obs_datasets, input_path, target_mon, obs_lat, obs_lon):
     obs_coeffs = pd.DataFrame(columns=obs_datasets, index=['aam','aav'])
     
     for obs in obs_datasets:
-        ds = xr.open_dataset(input_path + "input_data/obs_regr_coeffs_"+obs+".nc")
+        ds = xr.open_dataset(input_path + "observations/obs_regr_coeffs_"+obs+".nc")
         ds = ds.isel(time=target_mon-1)
         ds = ds.sel(lat=obs_lat, lon=obs_lon, method='nearest').to_pandas()
 
