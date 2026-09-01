@@ -30,9 +30,7 @@ The contribution of observational data to the `aam` coefficient is controlled by
 
 The weighted coefficient is calculated as
 
-\[
-aam = (1-\alpha) aam_{\mathrm{CMIP6}} + \alpha aam_{\mathrm{obs}},
-\]
+`aam = (1 - alpha) * aam_CMIP6 + alpha * aam_obs`
 
 where `aam_obs` is the mean of the observational estimates from the selected observational datasets.
 
