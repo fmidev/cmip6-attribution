@@ -68,7 +68,7 @@ Next, specify some additional parameters used in the calculation
 
 # first and last years of observations used in calculation of probability distributions
 y1base=1901
-y2base=2024
+y2base=y_target-1
 # Assuming monthly mean temperatures are within -40 ... +40 C
 valmin=-40.0
 valmax=40.0
@@ -108,7 +108,6 @@ for the Tglob-regressed changes in mean and variability
 """
 #### A) Observed local temperatures  
 obs_temp = subroutines.read_obs_temp(input_path, fmisid, target_mon).loc[y1base:]
-obs_temp[2025] = 10.9
 
 ### B) The coefficients for the Tglob-regressed changes in mean and variability
 coeffs_single = subroutines.read_coeffs_single_models(input_path,ssp, target_mon, latlon[0], latlon[1])
@@ -408,8 +407,8 @@ textstr = '\n'.join((
     str(y1base)+'-'+str(y2base)+': '+f'{np.round(prob_in_obs*100,1):.1f} (' +\
     f'{np.round(prob_in_obs_up*100,1):.1f}-'+f'{np.round(prob_in_obs_low*100,1):.1f}) %',
     '',
-    "\'"+str(y_preind)+"\'"+': '+f'{np.round(prob_in_preind*100,1):.1f} (' +\
-    f'{np.round(prob_in_preind_up*100,1):.1f}-'+f'{np.round(prob_in_preind_low*100,1):.1f}) %',
+    "\'"+str(y_preind)+"\'"+': '+f'{np.round(prob_in_preind*100,2):.2f} (' +\
+    f'{np.round(prob_in_preind_up*100,2):.2f}-'+f'{np.round(prob_in_preind_low*100,2):.2f}) %',
     "\'"+str(y_target)+"\'"+': '+f'{np.round(prob_in_target*100,1):.1f} ('+\
     f'{np.round(prob_in_target_up*100,1):.1f}-'+f'{np.round(prob_in_target_low*100,1):.1f}) %',
     "\'"+str(y_climate)+"\'"+': '+f'{np.round(prob_in_future*100,1):.1f} ('+\
@@ -439,8 +438,8 @@ textstr = '\n'.join((
 
 props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 # place a text box in upper left in axes coords
-# ax2.text(1.04, 0.99, textstr, transform=ax.transAxes, fontsize=13,
-#           verticalalignment='top', bbox=props)
+ax2.text(1.04, 0.99, textstr, transform=ax.transAxes, fontsize=13,
+          verticalalignment='top', bbox=props)
 
 # ax.set_title('b) '+subroutines.get_target_text(target_mon)+' temperature distributions' , loc='left', 
 #               fontsize=14)
