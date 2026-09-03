@@ -6,8 +6,7 @@ Created on Tue Mar  7 13:55:35 2023
 @author: rantanem
 """
 
-import sys
-
+import sys, os
 import numpy as np
 import pandas as pd
 import requests
@@ -575,3 +574,89 @@ def get_obs_coeffs(obs_datasets, input_path, target_mon, obs_lat, obs_lon):
         obs_coeffs[obs] = ds
     
     return obs_coeffs
+
+def calculate_obs_aam(obs_temp, input_path):
+
+    from scipy import stats
+
+    # Read 11-year global mean temperature from HadCRUT5
+    g11 = xr.open_dataarray(os.path.join(input_path, "observations", "g11_HadCRUT5.nc"))
+
+    # Convert g11 time coordinate to years
+    g11_year = g11.assign_coords(time=g11.time.dt.year)
+
+    # Convert to pandas Series
+    g11_series = g11_year.to_pandas()
+
+    # Align station observations and global temperature
+    data = pd.concat([obs_temp.rename("local"), g11_series.rename("g11")],
+                     axis=1,join="inner").dropna()
+
+    # Linear regression
+    slope, intercept, _, _, _ = stats.linregress(data["g11"],data["local"])
+
+    return slope
+
+def read_obs_temp_window(input_path, fmisid, target_mon, aam_window=1):
+    """
+    Read observed local temperature and calculate a centered running mean
+    for the specified target month.
+
+    Parameters
+    ----------
+    input_path : str
+        Path to the input data.
+    fmisid : int
+        FMI station ID.
+    target_mon : int
+        Central month (1-12).
+    aam_window : int, optional
+        Width of the centered running mean. Must be a positive odd integer.
+        aam_window=1 gives the original monthly series.
+        aam_window=3 gives a centered 3-month mean.
+
+    Returns
+    -------
+    pandas.Series
+        Observed temperature series indexed by the year of the central month.
+    """
+
+    if aam_window < 1 or aam_window % 2 == 0:
+        raise ValueError("aam_window must be a positive odd integer.")
+
+    if not 1 <= target_mon <= 12:
+        raise ValueError("target_mon must be between 1 and 12.")
+
+    # Original approach: just read the target month
+    if aam_window == 1:
+        return read_obs_temp(input_path, fmisid, target_mon)
+
+    half_window = aam_window // 2
+
+    monthly_data = {}
+
+    # Read all months required for the centered window
+    for offset in range(-half_window, half_window + 1):
+
+        # Calculate month and year offset relative to target month
+        total_month = (target_mon - 1) + offset
+
+        month = total_month % 12 + 1
+        year_offset = total_month // 12
+
+        # Read the observational temperature for this month
+        temp = read_obs_temp(input_path, fmisid, month).copy()
+
+        # Shift the year so that it corresponds to the year of the
+        # central month
+        temp.index = temp.index - year_offset
+
+        monthly_data[offset] = temp
+
+    # Combine the monthly series
+    monthly_data = pd.concat(monthly_data, axis=1).sort_index()
+
+    # Require all months in the window to be available
+    obs_temp = monthly_data.mean(axis=1, skipna=False).dropna()
+
+    return obs_temp
