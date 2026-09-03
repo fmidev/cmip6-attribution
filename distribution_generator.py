@@ -69,9 +69,9 @@ ssp = 'ssp245'
 Next, specify some additional parameters used in the calculation
 ################################################################
 """
-# List of obs datasets
-obs_datasets = ["HadCRUT5","GISTEMP","BEST","NOAA"]
-n_obs = len(obs_datasets)
+# Monthly window used to smooth the regression coefficients
+# 3 = three-month averages, e.g. for January, DJF is used
+aam_window=3
 
 # first and last years of observations used in calculation of probability distributions
 y1base=1901
@@ -115,15 +115,18 @@ for the Tglob-regressed changes in mean and variability
 """
 #### A) Observed local temperatures  
 obs_temp = subroutines.read_obs_temp(input_path, fmisid, target_mon).loc[y1base:]
+if target_mon<=12:
+    obs_temp_window = subroutines.read_obs_temp_window(input_path,fmisid,target_mon,aam_window).loc[y1base:]
+else:
+    obs_temp_window = obs_temp
 
 ### B) The coefficients for the Tglob-regressed changes in mean and variability
 coeffs_single = subroutines.read_coeffs_single_models(input_path,ssp, target_mon, latlon[0], latlon[1])
 coeffs_cmip6_mean = subroutines.read_coeffs_model_mean(input_path,ssp, target_mon, latlon[0], latlon[1])
 
-### C) The observational coefficients for the Tglob-regressed changes in mean
-coeffs_obs = subroutines.get_obs_coeffs(obs_datasets, input_path, target_mon, latlon[0], latlon[1])
-aam_obs = coeffs_obs.loc["aam"].mean()
-
+### C) The observational coefficient for the Tglob-regressed changes in mean. 
+### Use 3-month rolling mean temperature for single months
+aam_obs = subroutines.calculate_obs_aam(obs_temp_window,input_path)
 
 ### D) Apply observational weighting to aam
 # CMIP6 multi-model mean coefficients
